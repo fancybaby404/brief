@@ -13,7 +13,7 @@ Gates from `ACCEPTANCE_TESTS.md`. PASS needs evidence; BLOCKED names what is mis
 | Unit/static tests | PASS (2026-10-09) | `npm test`: 18/18 |
 | JS bundle builds | PASS (2026-10-09) | `npx expo export --platform android` → 2.1 MB Hermes bundle |
 | Jobicy live response | PASS (2026-10-09, desktop curl) | HTTP 200, 1.5 s; field shape captured in `tests/logic.test.mjs` |
-| Native Android dev build | PASS (2026-10-09) | EAS `development` profile, build 87dd59d0-9743-40ff-a528-854b3e13445f (APK). Not yet launched on a phone |
+| Native Android dev build | PASS (2026-10-09) | EAS `development` APK, build d0b5c757-a07f-4499-b8c3-2395925f0fe8 (adds Reanimated 4.5.1, Gesture Handler 2.32, Keyboard Controller 1.21.9; supersedes 87dd59d0). Not yet launched on a phone |
 | Native iOS dev build | BLOCKED | Needs macOS + Xcode |
 | UI & navigation gates on device | BLOCKED | Needs dev build |
 | SQLite persistence across force-close | BLOCKED | Needs dev build |
@@ -25,7 +25,7 @@ Gates from `ACCEPTANCE_TESTS.md`. PASS needs evidence; BLOCKED names what is mis
 | No secrets/resume/GGUF in git | PASS (2026-10-09) | `.gitignore` covers `*.gguf`, `.env`, keystores; `git status` reviewed before commit |
 
 ## Known issues to check on device
-- **Rebuild required:** Reanimated, Gesture Handler and Keyboard Controller are native modules added after build 87dd59d0. Loading the new JS into that build will fail; install a new development build first.
+- **Use build d0b5c757 or later.** Builds before it lack Reanimated / Gesture Handler / Keyboard Controller and crash with the current JS.
 - Feel-check on the slowest phone: flick the save/filter sheet down fast and slow, grab it mid-close; swipe a job left slowly past the threshold and back (haptic should tick both ways), then flick; scroll Explore vertically to confirm swipes never steal the scroll; open/close the + and profile menus rapidly; swipe calendar months.
 - Keyboard: composers rely on `KeyboardAvoidingView behavior="padding"` with offset `insets.top + 59` (header height). Verify on Android edge-to-edge and iOS.
 - Jobicy `count=40` with no pagination yet (`nextCursor` is available).
