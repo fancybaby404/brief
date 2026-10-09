@@ -13,7 +13,7 @@ unzip brief-local-ai-starter.zip
 cd brief-starter
 bash scripts/install-agent-skills.sh    # requires internet, installs selected Claude Code skills
 bash scripts/setup.sh                   # requires internet, installs Expo and native libraries
-npm run android                        # on Android SDK host with device/emulator
+npx eas-cli@latest build --profile development --platform android   # cloud dev build (no local SDK); or npm run android with Android Studio
 # or npm run ios                       # on macOS with Xcode
 ```
 
