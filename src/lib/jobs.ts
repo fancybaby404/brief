@@ -1,20 +1,8 @@
 import type { RemoteJob } from '../types';
+import { htmlToText } from './format';
 // Public endpoint, remote positions only. Jobicy terms: credit Jobicy with a link and send
 // every apply action to the original job URL from the feed.
 export const JOBICY_CREDIT_URL = 'https://jobicy.com';
-
-const entities: Record<string, string> = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“', ndash: '–', mdash: '—', hellip: '…', bull: '•' };
-export function htmlToText(html: string) {
-  return html
-    .replace(/<li[^>]*>/gi, '\n• ')
-    .replace(/<br\s*\/?>|<\/(p|div|h\d|li|ul|ol)>/gi, '\n')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
-    .replace(/&([a-z]+);/gi, (m, n) => entities[n.toLowerCase()] ?? m)
-    .replace(/[ \t]+/g, ' ')
-    .split('\n').map(l => l.trim()).filter(Boolean).join('\n');
-}
 
 const periods: Record<string, string> = { yearly: 'year', monthly: 'month', weekly: 'week', daily: 'day', hourly: 'hour' };
 function salary(j: any) {

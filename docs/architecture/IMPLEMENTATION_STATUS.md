@@ -39,6 +39,10 @@
 - **Job detail:** long descriptions collapse to 9 lines with Show more / Show less.
 - **iOS feel:** `Tap` gives touch-down highlight on every control; `Sheet` springs up (ratio 0.85 / 0.3 s), drag-down or tap-out dismisses, rubber-bands when pulled up, cross-fades under Reduce Motion; menus grow from their trigger (critically damped); large titles use negative tracking; 44 pt header targets.
 
+### 2026-10-09 — job description formatting
+- `src/lib/format.ts`: provider HTML → a small stored text format (`## heading`, `• bullet`, `**bold**`, blank line between blocks). Handles real Jobicy patterns: `<h2>/<h3>`, bold-only "Overview:" paragraphs as headings, fake `·` bullet paragraphs, `<li><strong>Label:</strong>`, `<li><p>`, `<br>`, numeric entities, Unicode spaces, space-before-punctuation left by removed links. Verified on 50 live PH-filtered listings: 0 leftover tags/entities, 0 empty blocks.
+- `Description` component renders headings, hanging-indent bullets, inline bold labels, selectable 15/22 body text; "Show more" collapses on whole blocks (never mid-bullet or on a dangling heading). Used on job detail and saved application detail. The same parser tidies OCR/typed descriptions ("Requirements:", "- item", "2) item"). Tests: `tests/format.test.mjs`; `npm test` now loads `tests/ts-resolve.mjs` so modules can import each other Metro-style.
+
 ## Next tasks in order
 1. **P0**: `scripts/setup.sh` + `npm run typecheck` + Android dev build; fix dependency APIs, permissions, runtime import errors, SafeArea/keyboard collisions, design bugs.
 2. **P0**: import/test Qwen Q4 GGUF on actual target phone; run airplane-mode chat and mock; reduce prompt/context memory footprint as needed.

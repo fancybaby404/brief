@@ -1,7 +1,7 @@
 // Pure-logic tests. Node 24 strips TS types, so these import src modules directly.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mapJobicyJob, htmlToText, jobsUrl, filterByType, DEFAULT_FILTERS } from '../src/lib/jobs.ts';
+import { mapJobicyJob, jobsUrl, filterByType, DEFAULT_FILTERS } from '../src/lib/jobs.ts';
 import { progressBuckets, filterSortApplications } from '../src/lib/tracker.ts';
 import { parseJobExtraction, userContext } from '../src/lib/prompts.ts';
 
@@ -30,10 +30,6 @@ test('missing salary stays empty instead of an invented value', () => {
 test('keeps canonical Jobicy URL, id, title, company and geography', () => {
   const j = mapJobicyJob(jobicy);
   assert.deepEqual([j.id, j.url, j.title, j.company, j.location], ['152819', jobicy.url, 'Software Engineer', 'Bayesian Health', 'USA']);
-});
-
-test('htmlToText keeps paragraph/list structure and decodes entities', () => {
-  assert.equal(htmlToText(jobicy.jobDescription), 'About us\nWe build tools & things ’n stuff.\n• One\n• Two');
 });
 
 test('keeps the provider company logo and tidies multi-region locations', () => {

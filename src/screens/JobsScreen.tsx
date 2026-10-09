@@ -2,6 +2,7 @@ import React,{useEffect,useState} from 'react';
 import {ActivityIndicator,Alert,Linking,ScrollView,TextInput,View} from 'react-native';
 import {useBrief} from '../lib/appContext';import {C} from '../theme/tokens';
 import {Card,CompanyLogo,Heading,Icon,Primary,Sheet,Tap,Txt} from '../components/Ui';
+import {Description} from '../components/Description';
 import {fetchRemoteJobs,DEFAULT_FILTERS,JOBICY_CREDIT_URL,type JobFilters} from '../lib/jobs';import {uid} from '../lib/db';import type {Application,ApplicationStatus,RemoteJob} from '../types';
 const REGIONS:{value:JobFilters['geo'],label:string,phrase:string}[]=[{value:'philippines',label:'Philippines',phrase:'the Philippines'},{value:'apac',label:'Asia-Pacific',phrase:'Asia-Pacific'},{value:'',label:'All regions',phrase:'any region'}];
 const TYPES:{value:JobFilters['type'],label:string}[]=[{value:'',label:'Any'},{value:'Full-Time',label:'Full-time'},{value:'Part-Time',label:'Part-time'},{value:'Contract',label:'Contract'}];
@@ -40,9 +41,9 @@ const saveOptions:{status:ApplicationStatus,title:string,sub:string,icon:string}
  {status:'interested',title:'Mark as interested',sub:'You might apply',icon:'heart-outline'},
  {status:'applied',title:'Mark as applied',sub:'You already applied on the listing',icon:'document-text-outline'},
 ];
-export function JobDetailScreen(){const {selectedJob,putApp,applications,openChat,go}=useBrief();const [choose,setChoose]=useState(false),[expanded,setExpanded]=useState(false);
+export function JobDetailScreen(){const {selectedJob,putApp,applications,openChat,go}=useBrief();const [choose,setChoose]=useState(false);
  if(!selectedJob)return <View style={{padding:20}}><Txt>No job selected.</Txt></View>;
- const j=selectedJob;const existing=applications.find(x=>!!j.url&&x.sourceUrl===j.url);const long=j.description.length>520;
+ const j=selectedJob;const existing=applications.find(x=>!!j.url&&x.sourceUrl===j.url);
  const asApp=(status:ApplicationStatus):Application=>({id:existing?.id||uid('job'),title:j.title,company:j.company,location:j.location,salary:j.salary,employmentType:j.employmentType,description:j.description,sourceUrl:j.url,logoUrl:j.logo,status,createdAt:existing?.createdAt||new Date().toISOString(),appliedAt:status==='applied'?existing?.appliedAt||new Date().toISOString():existing?.appliedAt||null,notes:existing?.notes||''});
  async function save(status:ApplicationStatus){setChoose(false);await putApp(asApp(status));Alert.alert('Saved to Brief','This updates your private tracker. It does not apply to the job for you.');go('application-detail');}
  return <View style={{flex:1}}><ScrollView contentContainerStyle={{padding:19,paddingTop:4,paddingBottom:130,gap:14}}>
@@ -55,8 +56,7 @@ export function JobDetailScreen(){const {selectedJob,putApp,applications,openCha
  </View>
  {existing&&<Txt size={12} color={C.green}>In your tracker as “{existing.status.replace('_',' ')}”</Txt>}
  <View style={{flexDirection:'row',gap:9}}><View style={{flex:1}}><Primary label="Open listing ↗" onPress={()=>j.url?void Linking.openURL(j.url):Alert.alert('Unavailable','No original link was provided.')}/></View><View style={{flex:1}}><Primary secondary label={existing?'Update in Brief':'Save to Brief'} onPress={()=>setChoose(true)}/></View></View>
- <Card><Txt bold size={16}>About the role</Txt><Txt color={C.muted} style={{marginTop:9}} numberOfLines={long&&!expanded?9:undefined}>{j.description||'No description supplied by the provider.'}</Txt>
- {long&&<Tap accessibilityRole="button" accessibilityLabel={expanded?'Show less':'Show more'} hitSlop={10} onPress={()=>setExpanded(!expanded)} style={{flexDirection:'row',alignItems:'center',gap:4,marginTop:10,minHeight:32}}><Txt color={C.blue} size={14} bold>{expanded?'Show less':'Show more'}</Txt><Icon name={expanded?'chevron-up':'chevron-down'} size={15} color={C.blue}/></Tap>}</Card>
+ <Card style={{padding:16}}><Txt bold size={17} style={{marginBottom:12}}>About the role</Txt><Description key={j.id} text={j.description} empty="No description supplied by the provider."/></Card>
  <Primary label="Ask Brief about this job" secondary onPress={()=>openChat(existing||{...asApp('saved'),id:'preview-'+j.id})}/>
  <Credit/>
  </ScrollView>
