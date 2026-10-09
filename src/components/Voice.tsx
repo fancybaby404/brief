@@ -1,5 +1,5 @@
 import React,{useEffect} from 'react';
-import {ScrollView,View} from 'react-native';
+import {View} from 'react-native';
 import Reanimated,{cancelAnimation,useAnimatedStyle,useSharedValue,withRepeat,withSequence,withTiming,type SharedValue} from 'react-native-reanimated';
 import {C} from '../theme/tokens';
 import {EASE_IN_OUT,EASE_OUT} from '../theme/motion';
@@ -55,12 +55,12 @@ export function FeedbackCard({feedback,text}:{feedback?:InterviewFeedback,text:s
 /** Read-only review of a past session: transcript and feedback, from SQLite. */
 export function SessionReviewSheet({session,messages,title,visible,onClose,onContinue}:{session:SessionSummary|null,messages:Message[],title:string,visible:boolean,onClose:()=>void,onContinue?:()=>void}){
  const fb=session?.feedback;
- return <FormSheet visible={visible} title={title} onClose={onClose} cancelLabel={null} doneLabel="Done" onDone={onClose} scroll={false}>
-  {session&&<ScrollView contentContainerStyle={{padding:16,gap:10,paddingBottom:40}}>
+ return <FormSheet visible={visible} title={title} onClose={onClose} doneLabel="Done" onDone={onClose}>
+  {session&&<View style={{gap:10}}>
    <Txt size={13} color={C.muted}>{[session.question?`Practice: “${session.question}”`:MOCK_MODES.find(m=>m.value===session.mode)?.label,new Date(session.startedAt).toLocaleDateString(undefined,{month:'short',day:'numeric'}),formatDuration(session.durationMs),`${session.answers} answer${session.answers===1?'':'s'}`,session.voice?'voice':'typed'].filter(Boolean).join(' · ')}</Txt>
    {messages.filter(m=>m.content!==MOCK_BEGIN&&m.content!==MOCK_FINISH&&m.id!==fb?.id).map(m=><MessageBubble key={m.id} role={m.role} avatar={26} text={m.content} animate={false}/>)}
    {fb&&<FeedbackCard feedback={fb.feedback} text={fb.content}/>}
    {!session.finished&&session.current&&onContinue&&<Tap accessibilityRole="button" onPress={onContinue} style={{minHeight:48,borderRadius:14,backgroundColor:C.blue,alignItems:'center',justifyContent:'center',marginTop:6}}><Txt bold color={C.white}>Continue this interview</Txt></Tap>}
-  </ScrollView>}
+  </View>}
  </FormSheet>;
 }

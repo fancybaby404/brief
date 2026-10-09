@@ -199,7 +199,11 @@ export function MockScreen(){const {applications,profile,mockJob:job,mockSetup,o
  {/* Interviewer */}
  {!kb&&<View style={{alignItems:'center',gap:2}}><CloudHalo size={118}><LiveMascot size={80} mood={phase==='thinking'||phase==='transcribing'?'question':phase==='error'?'sad':'happy'} label={PHASE_LABEL[phase]}/></CloudHalo><SpeakingBars active={phase==='speaking'}/></View>}
  <View style={{alignItems:'center',paddingHorizontal:16,gap:2}}>
-  <Tap accessibilityRole="button" onPress={()=>openMock(null)} style={{padding:6}}><Txt color={C.blue} size={12} numberOfLines={1}>‹ Change job · {job.title} at {job.company}</Txt></Tap>
+  <Tap accessibilityRole="button" accessibilityLabel={`Change job, currently ${job.title} at ${job.company}`} onPress={()=>openMock(null)} style={{flexDirection:'row',alignItems:'center',gap:8,maxWidth:'100%',paddingVertical:5,paddingLeft:6,paddingRight:11,borderRadius:22,backgroundColor:C.white,borderWidth:1,borderColor:C.line}}>
+   <CompanyLogo uri={job.logoUrl} size={24} circle/>
+   <Txt size={12} numberOfLines={1} style={{flexShrink:1}}><Txt size={12} bold>{job.company}</Txt><Txt size={12} color={C.muted}> · {job.title}</Txt></Txt>
+   <Txt size={12} bold color={C.blue}>Change</Txt>
+  </Tap>
   {started&&<View style={{flexDirection:'row',alignItems:'center',gap:10,flexWrap:'wrap',justifyContent:'center'}}>
    <Txt size={12} color={C.muted} numberOfLines={1} style={{flexShrink:1}}>{label}</Txt>
    {!practice&&<View accessible accessibilityLabel={`Question ${Math.min(TARGET_QUESTIONS,Math.max(1,vs.turn))} of ${TARGET_QUESTIONS}`} style={{flexDirection:'row',gap:4}}>{Array.from({length:TARGET_QUESTIONS},(_,i)=><View key={i} style={{width:7,height:7,borderRadius:4,backgroundColor:i<answered?C.blue:i<vs.turn?C.pale:C.line}}/>)}</View>}

@@ -1,7 +1,9 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {BackHandler,ScrollView,Text,View,useWindowDimensions,type DimensionValue} from 'react-native';
-import Reanimated,{Extrapolation,FadeIn,interpolate,useAnimatedRef,useAnimatedScrollHandler,useAnimatedStyle,useSharedValue,withDelay,withSpring,withTiming,type EntryExitAnimationFunction,type SharedValue} from 'react-native-reanimated';
-import {EASE_OUT,SPRING_SETTLE} from '../theme/motion';
+import Reanimated,{Extrapolation,FadeIn,cancelAnimation,interpolate,useAnimatedRef,useAnimatedScrollHandler,useAnimatedStyle,useSharedValue,withDelay,withRepeat,withSequence,withSpring,withTiming,type EntryExitAnimationFunction,type SharedValue} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+import type {DownloadResumable} from 'expo-file-system/legacy';
+import {EASE_IN_OUT,EASE_OUT,EASE_OUT_CSS,ROW_IN,ROW_OUT,SPRING_SETTLE} from '../theme/motion';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useBrief} from '../lib/appContext';
 import {C} from '../theme/tokens';
@@ -13,8 +15,10 @@ import type {Profile} from '../types';
 import {MODEL_CATALOG,type CatalogModel} from '../lib/modelCatalog';
 import {downloadCatalogBundle,deleteLocalFile,pickModel} from '../lib/imports';
 import {benchmarkModel,configureModel,modelPath,visionProjectorPath,supportsVision} from '../lib/ai';
+import {STT_MODELS,VAD_MODEL,formatMB,type SpeechModel} from '../lib/voice/catalog';
+import {downloadSpeechModels,installedModel as installedSpeechModel,speechInstalled} from '../lib/voice/stt';
 
-const PAGES=4;
+const PAGES=5;
 const shadow={shadowColor:'#33446A',shadowOpacity:0.1,shadowRadius:18,shadowOffset:{width:0,height:8},elevation:4} as const;
 
 function Headline({a,b}:{a:string,b:string}){return <Text accessibilityRole="header" style={{fontSize:32,lineHeight:37,fontWeight:'800',letterSpacing:-0.9,color:C.ink}}>{a}{'\n'}<Text style={{color:C.blue}}>{b}</Text></Text>;}
@@ -101,6 +105,103 @@ function PracticeArt(){
  </View>;
 }
 
+/** One bar of the "listening" waveform: breathes while its page is on screen, rests at a fixed height otherwise. */
+const BAR_REST=[0.45,0.8,1,0.65,0.4];
+function SoundBar({i,active}:{i:number,active:boolean}){
+ const reduce=useReducedMotion();const s=useSharedValue(BAR_REST[i]);
+ useEffect(()=>{
+  if(!active||reduce){cancelAnimation(s);s.set(withTiming(BAR_REST[i],{duration:200,easing:EASE_OUT}));return;}
+  const d=360+i*60;
+  s.set(withDelay(i*90,withRepeat(withSequence(withTiming(1,{duration:d,easing:EASE_IN_OUT}),withTiming(0.3,{duration:d,easing:EASE_IN_OUT})),-1)));
+  return ()=>cancelAnimation(s);
+ },[active,reduce]);
+ const style=useAnimatedStyle(()=>({transform:[{scaleY:s.get()}]}));
+ return <Reanimated.View style={[{width:4,height:22,borderRadius:2,backgroundColor:C.white},style]}/>;
+}
+
+/** Mascot listens (waveform), then the words appear: speech becomes text on the phone. */
+function VoiceArt({active,mood,ready}:{active:boolean,mood:'happy'|'question'|'sad',ready:boolean}){
+ const reduce=useReducedMotion();const shown=useSharedValue(0);
+ useEffect(()=>{if(active&&!shown.get())shown.set(reduce?1:withDelay(700,withTiming(1,{duration:320,easing:EASE_OUT})));},[active,reduce]);
+ const transcript=useAnimatedStyle(()=>({opacity:shown.get(),transform:[{translateY:(1-shown.get())*8}]}));
+ return <View style={{height:150,flexDirection:'row',alignItems:'flex-end'}}>
+ <View><CloudHalo size={150}><LiveMascot size={108} mood={mood}/></CloudHalo>
+  {ready&&<Reanimated.View entering={reduce?FadeIn.duration(200):SPARKLES_IN} pointerEvents="none" style={{position:'absolute',left:-2,top:4}}><Sparkles size={36}/></Reanimated.View>}</View>
+ <View style={{flex:1,gap:10,paddingBottom:30,marginLeft:-8,alignItems:'flex-end'}} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+  <View style={{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:C.blue,borderRadius:18,borderBottomRightRadius:6,paddingHorizontal:14,paddingVertical:11}}>
+   <Icon name="mic" size={16} color={C.white}/><View style={{flexDirection:'row',alignItems:'center',gap:4,height:22}}>{BAR_REST.map((_,i)=><SoundBar key={i} i={i} active={active}/>)}</View>
+  </View>
+  <Reanimated.View style={[{maxWidth:206,flexDirection:'row',gap:8,backgroundColor:C.white,borderRadius:18,borderBottomRightRadius:6,padding:12,...shadow,shadowOpacity:0.08},transcript]}>
+   <Icon name="text-outline" size={16} color={C.blue}/><Txt size={13} style={{flex:1,lineHeight:18}}>“I led a team of four to ship our app.”</Txt>
+  </Reanimated.View>
+ </View>
+ </View>;
+}
+
+function Progress({pct}:{pct:number}){
+ const p=useSharedValue(pct/100);
+ useEffect(()=>{p.set(withTiming(pct/100,{duration:240,easing:EASE_OUT}));},[pct]);
+ const fill=useAnimatedStyle(()=>({transform:[{scaleX:p.get()}]}));
+ return <View style={{height:6,borderRadius:3,backgroundColor:C.line,overflow:'hidden'}}><Reanimated.View style={[{height:6,backgroundColor:C.blue,transformOrigin:'left'},fill]}/></View>;
+}
+
+const VOICE_BLURB:Record<string,string>={'whisper-base-en':'Quick and light','whisper-small-en':'Better with accents, a bit slower'};
+const voiceSize=(m:SpeechModel)=>formatMB(m.bytes+VAD_MODEL.bytes);
+type VoiceSetup={phase:'idle'|'download'|'verify'|'ready'|'error',pct:number,message:string,model:SpeechModel|null};
+const card={backgroundColor:C.white,borderRadius:20,borderWidth:1,borderColor:C.line,paddingHorizontal:14,...shadow,shadowOpacity:0.05} as const;
+
+/** Optional offline speech recognition for voice answers. Same download, size and checksum checks as Settings. */
+function VoicePage({x,i,width,active,onBusyChange}:{x:SharedValue<number>,i:number,width:number,active:boolean,onBusyChange:(busy:boolean)=>void}){
+ const [choice,setChoice]=useState(STT_MODELS[0].id),[setup,setSetup]=useState<VoiceSetup>({phase:'idle',pct:0,message:'',model:null});
+ const task=useRef<DownloadResumable|null>(null),cancelRequested=useRef(false);
+ useEffect(()=>{void Promise.all([speechInstalled(),installedSpeechModel()]).then(([ok,m])=>{if(ok){setSetup({phase:'ready',pct:0,message:'',model:m});if(m)setChoice(m.id);}}).catch(()=>{});},[]);
+ const busy=setup.phase==='download'||setup.phase==='verify';
+ async function download(){
+  const model=STT_MODELS.find(m=>m.id===choice)??STT_MODELS[0];
+  cancelRequested.current=false;onBusyChange(true);setSetup({phase:'download',pct:0,message:'',model});
+  try{
+   const done=await downloadSpeechModels(model,(stage,f)=>setSetup(s=>({...s,phase:stage,pct:Math.round(f*100)})),t=>{task.current=t;if(t&&cancelRequested.current)void t.cancelAsync();});
+   if(!done){setSetup({phase:'idle',pct:0,message:'Download canceled.',model:null});return;}
+   setSetup({phase:'ready',pct:0,message:'',model});void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }catch(e){setSetup({phase:'error',pct:0,message:(e as Error).message||'The voice model couldn’t be installed.',model});}
+  finally{task.current=null;cancelRequested.current=false;onBusyChange(false);}
+ }
+ const mood=busy?'question':setup.phase==='error'?'sad':'happy';
+ return <>
+  <Headline a="Answer" b="out loud."/>
+  <Lead>Speak your answers in mock interviews. Brief turns your voice into text right on this phone.</Lead>
+  <Parallax x={x} i={i} width={width}><VoiceArt active={active} mood={mood} ready={setup.phase==='ready'}/></Parallax>
+  {setup.phase==='ready'?<Reanimated.View key="ready" entering={ROW_IN} exiting={ROW_OUT} accessible accessibilityLiveRegion="polite" accessibilityLabel={`Voice answers are ready. ${setup.model?.name??''} speech model, works offline.`} style={[card,{flexDirection:'row',alignItems:'center',gap:12,minHeight:68}]}>
+   <View style={{width:40,height:40,borderRadius:12,backgroundColor:C.greenSoft,alignItems:'center',justifyContent:'center'}}><Icon name="checkmark-circle" size={22} color={C.green}/></View>
+   <View style={{flex:1}}><Txt bold size={15}>Voice answers are ready</Txt><Txt size={13} color={C.muted}>{setup.model?`${setup.model.name} · works offline`:'Works offline'}</Txt></View>
+  </Reanimated.View>
+  :busy?<Reanimated.View key="busy" entering={ROW_IN} exiting={ROW_OUT} style={[card,{paddingVertical:14,gap:10}]}>
+   <View accessibilityRole="progressbar" accessibilityLabel={setup.phase==='download'?'Downloading voice model':'Checking voice model'} accessibilityValue={{min:0,max:100,now:setup.pct}}><Progress pct={setup.pct}/></View>
+   <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
+    <Txt size={13} color={C.muted}>{setup.phase==='download'?'Downloading':'Checking the file'} · {setup.pct}%</Txt>
+    {setup.phase==='download'&&<Tap accessibilityRole="button" onPress={()=>{cancelRequested.current=true;void task.current?.cancelAsync();}} style={{minHeight:44,minWidth:64,alignItems:'flex-end',justifyContent:'center'}}><Txt size={14} bold color={C.blue}>Cancel</Txt></Tap>}
+   </View>
+  </Reanimated.View>
+  :<Reanimated.View key="choose" entering={ROW_IN} exiting={ROW_OUT} style={{gap:10}}>
+   <View accessibilityRole="radiogroup" style={card}>
+    {STT_MODELS.map((m,n)=>{const on=m.id===choice;return <Tap key={m.id} accessibilityRole="radio" accessibilityState={{checked:on}} accessibilityLabel={`${m.name}${n===0?', recommended':''}. ${voiceSize(m)}. ${VOICE_BLURB[m.id]??m.description}`} onPress={()=>{if(on)return;setChoice(m.id);void Haptics.selectionAsync();}} style={{flexDirection:'row',alignItems:'center',gap:12,minHeight:64,borderTopWidth:n?1:0,borderTopColor:C.line}}>
+     <View style={{width:40,height:40,borderRadius:12,backgroundColor:C.pale,alignItems:'center',justifyContent:'center'}}><Icon name={n?'ear-outline':'flash-outline'} size={21} color={C.blue}/></View>
+     <View style={{flex:1}}>
+      <View style={{flexDirection:'row',alignItems:'center',gap:6}}><Txt bold size={15}>{m.name}</Txt>{n===0&&<View style={{backgroundColor:C.pale,borderRadius:8,paddingHorizontal:7,paddingVertical:2}}><Txt size={11} bold color={C.blue}>Recommended</Txt></View>}</View>
+      <Txt size={13} color={C.muted}>{voiceSize(m)} · {VOICE_BLURB[m.id]??m.description}</Txt>
+     </View>
+     <View style={{width:22,height:22,borderRadius:11,borderWidth:2,borderColor:on?C.blue:'#C9D6EA',alignItems:'center',justifyContent:'center'}}>
+      <Reanimated.View style={{width:10,height:10,borderRadius:5,backgroundColor:C.blue,transitionProperty:'transform',transitionDuration:180,transitionTimingFunction:EASE_OUT_CSS,transform:[{scale:on?1:0}]}}/>
+     </View>
+    </Tap>;})}
+   </View>
+   {!!setup.message&&<View accessibilityLiveRegion="polite" accessibilityRole={setup.phase==='error'?'alert':undefined}><Txt size={13} color={setup.phase==='error'?C.danger:C.muted} style={{textAlign:'center'}}>{setup.message}</Txt></View>}
+   <Primary secondary label={setup.phase==='error'?'Try again':`Download · ${voiceSize(STT_MODELS.find(m=>m.id===choice)??STT_MODELS[0])}`} onPress={()=>void download()}/>
+  </Reanimated.View>}
+  <Txt size={12} color={C.muted} style={{textAlign:'center'}}>Optional. You can always type instead, or set this up later in Settings → Voice interviews. Your voice stays on this phone and is never saved.</Txt>
+ </>;
+}
+
 /** Page indicator that tracks the finger: each dot's fill follows the pager's live scroll position. */
 function PageDot({x,i,width}:{x:SharedValue<number>,i:number,width:number}){
  const fill=useAnimatedStyle(()=>({opacity:interpolate(x.get(),[(i-1)*width,i*width,(i+1)*width],[0,1,0],Extrapolation.CLAMP)}));
@@ -112,16 +213,16 @@ function PageDots({x,width,index}:{x:SharedValue<number>,width:number,index:numb
  </View>;
 }
 
-/** First-launch onboarding: four swipeable pages. Everything entered here is saved to the local profile
+/** First-launch onboarding: five swipeable pages. Everything entered here is saved to the local profile
  *  immediately; Skip / Get started set the `onboarded` pref so it never shows again. */
 export function OnboardingScreen(){
  const {profile,finishOnboarding}=useBrief();
  const {width}=useWindowDimensions();const insets=useSafeAreaInsets();const reduce=useReducedMotion();
  const pager=useAnimatedRef<Reanimated.ScrollView>();const x=useSharedValue(0);
  const onScroll=useAnimatedScrollHandler(e=>{x.set(e.contentOffset.x);});
- const [index,setIndex]=useState(0),[setupStage,setSetupStage]=useState<ModelSetupStage|null>(null),[modelProgress,setModelProgress]=useState<number|null>(null),[installedModel,setInstalledModel]=useState(''),[setupMessage,setSetupMessage]=useState(''),[setupError,setSetupError]=useState(false);
+ const [index,setIndex]=useState(0),[voiceBusy,setVoiceBusy]=useState(false),[setupStage,setSetupStage]=useState<ModelSetupStage|null>(null),[modelProgress,setModelProgress]=useState<number|null>(null),[installedModel,setInstalledModel]=useState(''),[setupMessage,setSetupMessage]=useState(''),[setupError,setSetupError]=useState(false);
  const downloadTask=useRef<import('expo-file-system/legacy').DownloadResumable|null>(null),cancelRequested=useRef(false);
- const setupBusy=setupStage!==null;
+ const setupBusy=setupStage!==null||voiceBusy;
  useEffect(()=>{void modelPath().then(setInstalledModel);},[]);
  const goTo=(i:number)=>{if(setupBusy)return;setIndex(i);pager.current?.scrollTo({x:i*width,animated:!reduce});};
  useEffect(()=>{const s=BackHandler.addEventListener('hardwareBackPress',()=>{if(setupBusy)return true;if(index>0){goTo(index-1);return true;}return false;});return ()=>s.remove();},[index,width,setupBusy]);
@@ -196,6 +297,7 @@ export function OnboardingScreen(){
     <Txt size={11} color={C.muted} style={{textAlign:'center'}}>Source: official Qwen GGUF files on Hugging Face. Downloads stay on this device; conversations never leave it.</Txt>
    </View>
   </>)}
+  {page(4,<VoicePage x={x} i={4} width={width} active={index===4} onBusyChange={setVoiceBusy}/>)}
  </Reanimated.ScrollView>
  <View style={{paddingHorizontal:24,paddingTop:10,paddingBottom:Math.max(insets.bottom,12)+4,gap:12}}>
   <PageDots x={x} width={width} index={index}/>

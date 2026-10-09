@@ -1,5 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {Alert,AppState,TextInput,View} from 'react-native';
+import {Alert,AppState,Dimensions,TextInput,View} from 'react-native';
 import {C} from '../theme/tokens';
 import {Icon,Tap,Txt} from './Ui';
 import {FormSheet} from './FormSheet';
@@ -17,13 +17,13 @@ export function NotesSheet({visible,initial,onSave,onClose}:{visible:boolean,ini
  const change=(v:string)=>{setText(v);if(timer.current)clearTimeout(timer.current);timer.current=setTimeout(flush,600);};
  const close=()=>{flush();onClose();};
  const clear=()=>Alert.alert('Delete notes?','Your notes for this job will be removed.',[{text:'Cancel',style:'cancel'},{text:'Delete',style:'destructive',onPress:()=>{latest.current='';setText('');flush();onClose();}}]);
- return <FormSheet visible={visible} title="Your notes" cancelLabel={null} doneLabel="Done" onDone={close} onClose={close} scroll={false}>
-  <View style={{flexDirection:'row',alignItems:'center',gap:6,paddingHorizontal:20,paddingBottom:6}}>
+ return <FormSheet visible={visible} title="Your notes" doneLabel="Done" onDone={close} onClose={close} scroll={false}>
+  <View style={{flexDirection:'row',alignItems:'center',gap:6,paddingBottom:6}}>
    <Icon name="lock-closed" size={13} color={C.muted}/><Txt size={13} color={C.muted} style={{flex:1}}>Private · stays on this phone</Txt>
    {!!text.trim()&&<Tap accessibilityRole="button" accessibilityLabel="Delete notes" hitSlop={10} onPress={clear} style={{minHeight:32,justifyContent:'center'}}><Txt size={14} color={C.danger}>Delete</Txt></Tap>}
   </View>
   <TextInput accessibilityLabel="Your notes" value={text} onChangeText={change} onBlur={flush} multiline autoFocus={!initial} scrollEnabled
    placeholder={'Interviewer names, questions to ask, salary talk, how it went…'} placeholderTextColor={C.soft}
-   style={{flex:1,paddingHorizontal:20,paddingTop:8,paddingBottom:24,fontSize:17,lineHeight:25,color:C.ink,textAlignVertical:'top'}}/>
+   style={{height:Math.round(Dimensions.get('window').height*0.42),paddingTop:8,paddingBottom:24,fontSize:17,lineHeight:25,color:C.ink,textAlignVertical:'top'}}/>
  </FormSheet>;
 }

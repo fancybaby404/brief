@@ -1,8 +1,8 @@
 export type CatalogAsset={
  fileName:string;
  url:string;
- approximateBytes:number;
- minimumBytes:number;
+ /** Exact size at the pinned revision; a download of any other size is rejected. */
+ bytes:number;
 };
 
 export type CatalogModel={
@@ -13,8 +13,7 @@ export type CatalogModel={
  repo:string;
  revision:string;
  sizeLabel:string;
- approximateBytes:number;
- minimumBytes:number;
+ bytes:number;
  license:string;
  url:string;
  projector?:CatalogAsset;
@@ -29,8 +28,8 @@ export const MODEL_CATALOG:CatalogModel[]=[
  {
   id:'qwen3-vl-2b-q4km',name:'Qwen3‑VL · 2B',description:'Understands text and images. The matching vision encoder is included in the download.',
   fileName:'Qwen3VL-2B-Instruct-Q4_K_M.gguf',repo:qwenVisionRepo,revision:qwenVisionRevision,
-  sizeLabel:'about 1.6 GB total',approximateBytes:1_200_000_000,minimumBytes:1_150_000_000,
+  sizeLabel:'about 1.6 GB total',bytes:1_107_409_952,
   license:'Apache 2.0',url:resolve('Qwen3VL-2B-Instruct-Q4_K_M.gguf'),
-  projector:{fileName:'mmproj-Qwen3VL-2B-Instruct-Q8_0.gguf',url:resolve('mmproj-Qwen3VL-2B-Instruct-Q8_0.gguf'),approximateBytes:445_000_000,minimumBytes:420_000_000},
+  projector:{fileName:'mmproj-Qwen3VL-2B-Instruct-Q8_0.gguf',url:resolve('mmproj-Qwen3VL-2B-Instruct-Q8_0.gguf'),bytes:445_053_216},
  },
 ];

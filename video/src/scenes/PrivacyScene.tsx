@@ -37,7 +37,7 @@ export const PrivacyScene: React.FC = () => {
       <Headline
         name="Privacy headline"
         premountFor={fps}
-        style={{ left: 880, bottom: 400 }}
+        style={{ left: 880, bottom: 250 }}
       >
         Works in airplane mode
       </Headline>

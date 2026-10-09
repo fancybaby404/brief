@@ -169,3 +169,6 @@
 5. **P1**: local notifications, event editor and timeline.
 6. **P1**: beautiful design polish against references, test small-screen iOS/Android dark mode, Dynamic Type, reduced motion.
 7. **P2**: local on-device voice STT/TTS for mock; optional OS share extension and job discovery pagination/filter.
+
+### 2026-10-10 — onboarding voice page (5 pages)
+- New last page `VoicePage` in `OnboardingScreen`: optional offline speech-model setup via `downloadSpeechModels` (same size + SHA-256 checks as Settings). Mascot mood follows setup (thinking while downloading, sad on error, sparkles when ready); waveform breathes only while the page is visible; transcript bubble rises in once; animated progress bar; radio choice with haptics. Reduce Motion keeps everything static. Pager, Continue/Skip and Android back are locked during the download. Not yet checked on a device.

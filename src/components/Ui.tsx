@@ -68,8 +68,8 @@ export function SectionTitle({children,right,onRight}:{children:string,right?:st
 const BROKEN_LOGOS=new Set<string>(),LOADED_LOGOS=new Set<string>();
 /** Provider logo when available; a neutral briefcase tile when missing, broken or not yet loaded. Never a guessed logo.
  *  expo-image keeps logos in memory and on disk (keyed by URL), so they show instantly on return and offline after first view. */
-export const CompanyLogo=React.memo(function CompanyLogo({uri,size=40}:{uri?:string,size?:number}) {
- const [failed,setFailed]=useState(()=>!!uri&&BROKEN_LOGOS.has(uri)),[loaded,setLoaded]=useState(()=>!!uri&&LOADED_LOGOS.has(uri));const box={width:size,height:size,borderRadius:size*0.26};
+export const CompanyLogo=React.memo(function CompanyLogo({uri,size=40,circle}:{uri?:string,size?:number,circle?:boolean}) {
+ const [failed,setFailed]=useState(()=>!!uri&&BROKEN_LOGOS.has(uri)),[loaded,setLoaded]=useState(()=>!!uri&&LOADED_LOGOS.has(uri));const box={width:size,height:size,borderRadius:circle?size/2:size*0.26};
  const tile=<View style={[box,{backgroundColor:C.pale2,alignItems:'center',justifyContent:'center'}]}><Icon name="briefcase-outline" color={C.blue} size={size*0.5}/></View>;
  if(!uri||failed)return tile;
  // Seen this session = in expo-image's memory cache: draw it directly. New: the tile shows until it has loaded.

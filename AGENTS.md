@@ -27,3 +27,6 @@ Issues and specs live in GitHub Issues (fancybaby404/brief), via the `gh` CLI. S
 ### Domain docs
 
 Single-context: root `GLOSSARY.md` + `docs/adr/`. See `docs/agents/domain.md`.
+
+## Verification
+- `npx tsc --noEmit` and `npm test`. After changing a model catalog, run `CHECK_MODEL_SOURCES=1 npm test` to compare the pinned sizes with Hugging Face.

@@ -85,8 +85,8 @@ export async function pickVisionProjector():Promise<string|null> {
 }
 export async function downloadCatalogBundle(model:CatalogModel,onProgress:(fraction:number)=>void,onTask:(task:FileSystem.DownloadResumable|null)=>void):Promise<{modelUri:string,projectorUri:string}|null>{
   if(!FileSystem.documentDirectory)throw new Error('Private document storage is unavailable');
-  const assets=[{fileName:model.fileName,url:model.url,approximateBytes:model.approximateBytes,minimumBytes:model.minimumBytes},...(model.projector?[model.projector]:[])];
-  const totalBytes=assets.reduce((sum,asset)=>sum+asset.approximateBytes,0);
+  const assets=[{fileName:model.fileName,url:model.url,bytes:model.bytes},...(model.projector?[model.projector]:[])];
+  const totalBytes=assets.reduce((sum,asset)=>sum+asset.bytes,0);
   const free=await FileSystem.getFreeDiskStorageAsync().catch(()=>null);
   if(free!==null&&free<totalBytes*1.08)throw new Error(`Brief needs about ${model.sizeLabel} plus temporary space. Free some storage and try again.`);
   const paths=assets.map((asset,index)=>FileSystem.documentDirectory+`brief-model-${model.id}-${index}-${Date.now()}.gguf`);
@@ -95,9 +95,9 @@ export async function downloadCatalogBundle(model:CatalogModel,onProgress:(fract
     for(let index=0;index<assets.length;index++){
       const asset=assets[index],dest=paths[index];
       const task=FileSystem.createDownloadResumable(asset.url,dest,{sessionType:FileSystem.FileSystemSessionType.BACKGROUND},p=>{
-        const expected=p.totalBytesExpectedToWrite>0?p.totalBytesExpectedToWrite:asset.approximateBytes;
+        const expected=p.totalBytesExpectedToWrite>0?p.totalBytesExpectedToWrite:asset.bytes;
         const fraction=Math.max(0,Math.min(1,p.totalBytesWritten/expected));
-        onProgress(Math.max(0,Math.min(1,(completedBytes+fraction*asset.approximateBytes)/totalBytes)));
+        onProgress(Math.max(0,Math.min(1,(completedBytes+fraction*asset.bytes)/totalBytes)));
       });
       onTask(task);
       let result:FileSystem.FileSystemDownloadResult|undefined;
@@ -105,8 +105,8 @@ export async function downloadCatalogBundle(model:CatalogModel,onProgress:(fract
       if(!result){for(const path of paths)await FileSystem.deleteAsync(path,{idempotent:true}).catch(()=>{});return null;}
       if(result.status<200||result.status>=300)throw new Error(`The model source returned ${result.status}. Try again when your connection is stable.`);
       const info=await FileSystem.getInfoAsync(dest);
-      if(!info.exists||!info.size||info.size<asset.minimumBytes)throw new Error(`The ${index===0?'model':'vision encoder'} download was incomplete. Please try again.`);
-      completedBytes+=asset.approximateBytes;
+      if(!info.exists||!info.size||info.size!==asset.bytes)throw new Error(`The ${index===0?'model':'vision encoder'} download was incomplete. Please try again.`);
+      completedBytes+=asset.bytes;
     }
     onProgress(1);
     return {modelUri:paths[0],projectorUri:paths[1]||''};
