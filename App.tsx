@@ -1,6 +1,8 @@
 import React,{useRef} from 'react';
 import {ActivityIndicator,StatusBar,View} from 'react-native';
 import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
+import {useFonts} from 'expo-font';
+import {Fredoka_700Bold} from '@expo-google-fonts/fredoka/700Bold';
 import {BriefProvider,useBrief} from './src/lib/appContext';
 import {C} from './src/theme/tokens';
 import {Header,FloatingNav,Overlays} from './src/components/Chrome';
@@ -15,6 +17,8 @@ import {ResumeScreen,SettingsScreen,NotificationsScreen} from './src/screens/Acc
 import {AddJobScreen} from './src/screens/AddJobScreen';
 import {OnboardingScreen} from './src/screens/OnboardingScreen';
 function Shell(){const {page,ready}=useBrief();
+ // Brand font loads with the database; if it fails the wordmark falls back to the system font.
+ const [fontsLoaded,fontError]=useFonts({Fredoka_700Bold});
  // Explore stays mounted once visited so search, filters, results and scroll survive job detail and tab switches.
  const jobsVisited=useRef(false);if(page==='jobs')jobsVisited.current=true;
  const hasTopHeader=!['onboarding'].includes(page);
@@ -22,7 +26,7 @@ function Shell(){const {page,ready}=useBrief();
  const screens={home:<HomeScreen/>,applications:<ApplicationsScreen/>,jobs:null, 'job-detail':<JobDetailScreen/>, 'application-detail':<ApplicationDetailScreen/>,calendar:<CalendarScreen/>,mock:<MockScreen/>,chat:<ChatScreen/>,resume:<ResumeScreen/>,notifications:<NotificationsScreen/>,settings:<SettingsScreen/>,'add-job':<AddJobScreen/>,onboarding:<OnboardingScreen/>};
  return <SafeAreaView style={{flex:1,backgroundColor:C.background}} edges={['top','left','right']}>
  <StatusBar barStyle="dark-content" backgroundColor={C.background}/>
- {!ready?<View style={{flex:1,justifyContent:'center'}}><ActivityIndicator size="large" color={C.blue}/></View>:<>
+ {!ready||!(fontsLoaded||fontError)?<View style={{flex:1,justifyContent:'center'}}><ActivityIndicator size="large" color={C.blue}/></View>:<>
  {hasTopHeader&&<Header plain={plainHeader}/>}
  {jobsVisited.current&&<View style={{flex:1,display:page==='jobs'?'flex':'none'}}><JobsScreen/></View>}
  {page!=='jobs'&&<View style={{flex:1}}>{screens[page]}</View>}

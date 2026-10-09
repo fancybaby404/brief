@@ -4,7 +4,7 @@
 Premium iOS feel, not visual noise. **A good job hunt organizer with a friendly briefcase**. Read `apple-design-reference.md` before modifying gestures and timing. Reference hierarchy: user-approved latest screenshots in `design/references/current/` > explicit product requirements here > earlier concepts (history).
 
 ## Identity
-- Brand: `brief` all lowercase, thick slightly rounded black lettering, mini mascot alongside.
+- Brand: `brief` all lowercase in **Fredoka Bold (700)** (`@expo-google-fonts/fredoka`, SIL OFL), black, mini mascot alongside. Loaded at startup with expo-font; falls back to the system font if loading fails. Wordmark does not scale with Dynamic Type.
 - Mascot: `assets/mascot-happy-original.png` user-supplied; `mascot-happy.png` automatically alpha-cropped for rendering. White 2D flat briefcase, heavy black outline, black feet, black dot eyes/smile/buckle, **NO ARMS/HANDS EVER**. Only compatible emotions via simple black ASCII-like face changes, not 3D and never another creature. Blue simple sparkle shapes or pale blue circle behind it are acceptable.
 - Large mascot LEFT of dashboard's speech bubble. On chat/mock larger mascot in calm blue halo; do not overpopulate screens with clones.
 
