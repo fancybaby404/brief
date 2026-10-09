@@ -53,6 +53,11 @@
 - **Swipe left** (`SwipeAction`, PanResponder + native-driver springs, no new native deps): 1:1 tracking, rubber-band past 88 px, haptic tick on crossing the threshold, flick commits, springs home with release velocity, only claims clearly horizontal drags. Already-tracked jobs reveal "In Brief" and don't re-commit. Also exposed as an accessibility action + bookmark button. One-time hint until the first Explore job is tracked.
 - **Status merge:** `saved` removed from `ApplicationStatus`; old rows load as `interested` (`normalizeApplication` in `db.listApplications`). Job detail sheet offers Interested or Applied; Add Job defaults to Interested. Un-bookmarking an Interested job removes it (confirms first if it has notes). Specs updated (SCREEN_INVENTORY, USER_JOURNEYS, ACCEPTANCE_TESTS).
 
+### 2026-10-09 — onboarding redesign (4 pages)
+- `OnboardingScreen`: native horizontal pager (`pagingEnabled`, native-driver scroll events) with dots that track the finger, light illustration parallax (off under Reduce Motion), Continue/Skip/Get started/Back, Android back steps pages. Layout measured in a 390×844 mock: all four pages fit without scrolling; smaller phones scroll within a page.
+- Functional, not placeholders: page 2 rows → `finishOnboarding()` then `openAddJob(intent)`; AddJobScreen consumes the intent once and starts library/camera import. Page 3 uploads via `pickResume`/`readResumeText` (honest notes for DOCX/scanned PDFs, offers manual entry), `ProfileForm` (pageSheet modal, keyboard-safe) saves name/goal/experience/education/skills, preview renders real profile data (`lib/profile.ts`, tested), AI toggle writes `useResumeForAI`. Everything saves to SQLite immediately.
+- Shared additions: `Primary` large + trailing icon, `Wordmark` (sized), `Sparkles`. Settings → "Show onboarding again" (`replayOnboarding`).
+
 ## Next tasks in order
 1. **P0**: `scripts/setup.sh` + `npm run typecheck` + Android dev build; fix dependency APIs, permissions, runtime import errors, SafeArea/keyboard collisions, design bugs.
 2. **P0**: import/test Qwen Q4 GGUF on actual target phone; run airplane-mode chat and mock; reduce prompt/context memory footprint as needed.

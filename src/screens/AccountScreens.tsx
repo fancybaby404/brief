@@ -22,7 +22,7 @@ export function ResumeScreen(){const {profile,updateProfile}=useBrief();const [e
  </ScrollView>;
 }
 export function NotificationsScreen(){return <ScrollView contentContainerStyle={{padding:18,paddingBottom:110,gap:15}}><Heading>Notifications</Heading><Card><Icon name="notifications-outline" color={C.blue} size={26}/><Txt bold>Nothing new</Txt><Txt color={C.muted}>Your events are in Calendar. Local reminder notifications are on the roadmap; this screen does not pretend reminders have been scheduled.</Txt></Card></ScrollView>}
-export function SettingsScreen(){const {profile,updateProfile}=useBrief();const [model,setModel]=useState(''),[busy,setBusy]=useState(''),[name,setName]=useState(profile.name),[result,setResult]=useState('');
+export function SettingsScreen(){const {profile,updateProfile,replayOnboarding}=useBrief();const [model,setModel]=useState(''),[busy,setBusy]=useState(''),[name,setName]=useState(profile.name),[result,setResult]=useState('');
  useEffect(()=>{void modelPath().then(setModel);},[]);
  async function importModel(){setBusy('Importing model… large files can take a minute.');setResult('');try{await releaseModel();const uri=await pickModel();if(!uri)return;await configureModel(uri);setModel(uri);setResult('Model imported. Tap “Test local model” to load it.');}catch(e){Alert.alert('Import failed',(e as Error).message);}finally{setBusy('');}}
  async function testModel(){setBusy('Loading model… 0%');setResult('');try{const r=await benchmarkModel(p=>setBusy(`Loading model… ${Math.round(p)}%`));setResult(`Ready on this device. Load ${(r.loadMs/1000).toFixed(1)} s · ${r.tokensPerSec.toFixed(1)} tokens/s.\nSample: “${r.sample}”`);}catch(e){setResult('');Alert.alert('Model failed',(e as Error).message);}finally{setBusy('');}}
@@ -30,5 +30,6 @@ export function SettingsScreen(){const {profile,updateProfile}=useBrief();const 
  <Card><Txt bold>Display name</Txt><Field label="Name" value={name} onChangeText={setName}/><Primary secondary label="Save name" onPress={()=>void updateProfile({...profile,name})}/></Card>
  <Card><Txt bold>On-device AI model</Txt><Txt color={C.muted} size={12} style={{marginVertical:9}}>{model?'GGUF model installed locally':'No model installed yet. Chat and Mock will ask you to install a model rather than secretly using a cloud service.'}</Txt><Primary label="Import GGUF model" disabled={!!busy} onPress={()=>void importModel()}/><View style={{height:8}}/><Primary label="Test local model" secondary disabled={!!busy||!model} onPress={()=>void testModel()}/>{!!(busy||result)&&<Txt size={12} color={busy?C.muted:C.green} style={{marginTop:10}}>{busy||result}</Txt>}</Card>
  <Card><Txt bold>Privacy</Txt><Txt color={C.muted} style={{marginTop:8}}>Applications, messages, and profile data are saved in your device's local SQLite database. Discovery requires an internet connection. No account or cloud LLM is configured.</Txt></Card>
+ <Card style={{gap:10}}><Txt bold>Welcome tour</Txt><Txt color={C.muted} size={12}>See the introduction again. Your jobs and profile are kept.</Txt><Primary secondary label="Show onboarding again" onPress={()=>void replayOnboarding()}/></Card>
  </ScrollView>;
 }

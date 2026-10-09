@@ -1,4 +1,5 @@
-import React,{createContext,useContext,useEffect,useState} from 'react';
+import React,{createContext,useContext,useEffect,useRef,useState} from 'react';
+export type AddJobIntent='library'|'camera'|'manual';
 import { Alert,BackHandler } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as DB from './db';
@@ -12,7 +13,8 @@ type AppState={
  chatJob:Application|null;openChat:(job?:Application|null)=>void;
  mockJob:Application|null;openMock:(job:Application|null)=>void;
  quick:boolean;toggleQuick:()=>void;profileMenu:boolean;toggleProfileMenu:()=>void;
- ready:boolean;finishOnboarding:()=>Promise<void>;
+ ready:boolean;finishOnboarding:(next?:Page)=>Promise<void>;replayOnboarding:()=>Promise<void>;
+ openAddJob:(intent:AddJobIntent)=>void;takeAddJobIntent:()=>AddJobIntent|null;
 };
 const Context=createContext<AppState|null>(null);
 export function useBrief(){const c=useContext(Context);if(!c)throw new Error('BriefProvider missing');return c;}
@@ -42,7 +44,12 @@ export function BriefProvider({children}:{children:React.ReactNode}) {
   if(page!==tab){go(tab);return true;}
   if(page!=='home'){setTab('home');go('home');return true;}
   return false;});return ()=>sub.remove();},[page,tab,quick,profileMenu]);
- const finishOnboarding=async()=>{await DB.setPref('onboarded','yes');go('home');};
- const value:AppState={page,tab,go,goTab,back,applications,events,profile,updateProfile,putApp,removeApp,putEvent,removeEvent,selectedApp,openApp,selectedJob,openJob,chatJob,openChat,mockJob,openMock,quick,toggleQuick:()=>{setProfileMenu(false);setQuick(v=>!v)},profileMenu,toggleProfileMenu:()=>{setQuick(false);setProfileMenu(v=>!v)},ready,finishOnboarding};
+ const finishOnboarding=async(next:Page='home')=>{await DB.setPref('onboarded','yes');setTab('home');go(next);};
+ const replayOnboarding=async()=>{await DB.setPref('onboarded','');go('onboarding');};
+ // Lets onboarding (or any shortcut) open Add Job with an import already started; consumed once by AddJobScreen.
+ const addJobIntent=useRef<AddJobIntent|null>(null);
+ const openAddJob=(intent:AddJobIntent)=>{addJobIntent.current=intent;go('add-job');};
+ const takeAddJobIntent=()=>{const i=addJobIntent.current;addJobIntent.current=null;return i;};
+ const value:AppState={page,tab,go,goTab,back,applications,events,profile,updateProfile,putApp,removeApp,putEvent,removeEvent,selectedApp,openApp,selectedJob,openJob,chatJob,openChat,mockJob,openMock,quick,toggleQuick:()=>{setProfileMenu(false);setQuick(v=>!v)},profileMenu,toggleProfileMenu:()=>{setQuick(false);setProfileMenu(v=>!v)},ready,finishOnboarding,replayOnboarding,openAddJob,takeAddJobIntent};
  return <Context.Provider value={value}>{children}</Context.Provider>;
 }

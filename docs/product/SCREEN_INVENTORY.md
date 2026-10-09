@@ -24,7 +24,7 @@
 11. **Resume**: BIG visual preview area near top, not a filename card, not green `Ready for AI personalization` line, no "How Brief uses your resume" promo card. Below preview: compact `View`, `Replace`, `Remove` actions. Below: `Resume summary` rows (experience, education, skills, location/goals) and Edit. Empty state in large preview region: "Tap to attach your resume". Uploaded resume and editable extracted text feed local AI. PDF should eventually render true pages natively; this starter shows visually formatted summary and OS open/share.
 12. **Notifications**: accessible from profile popover. Eventually actual local reminders (interviews/follow-up). MVP may show honest empty state.
 13. **Settings**: display name, local model installation progress/test, permissions, privacy and data controls, optional theme settings.
-14. **Onboarding**: welcoming nonblocking two-step; attach resume PDF or DOCX, enter manually, or skip. No login required. Do not force a large model installation to use tracker.
+14. **Onboarding** (first launch only; `onboarded` pref): four swipeable pages with page dots, Continue/Skip, and Get started/Back on the last page. (1) Welcome: wordmark, mascot on cloud with sparkles. (2) "Add jobs in seconds": Import screenshot / Take a photo / Add manually rows finish onboarding and open Add Job with that import started. (3) "Make Brief smarter with your resume": live resume preview from the profile, Upload resume (PDF/DOCX), Enter manually (form sheet), AI personalization toggle; skippable. (4) "Practice with Local AI": privacy facts and an honest note that a model is added later in Settings. No login, no forced model install. Settings → Welcome tour replays it.
 
 ## Mandatory states
 
