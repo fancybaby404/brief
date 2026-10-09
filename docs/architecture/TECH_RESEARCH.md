@@ -20,7 +20,7 @@
 ## Agent skills
 - Matt Pocock engineering skills: https://github.com/mattpocock/skills ; install with skills.sh, select `setup-matt-pocock-skills`, design/tdd/implement/qa workflows. A plugin alternative exists; do not install BOTH plugin and copied skills for the same agent.
 - Ponytail & Caveman: https://github.com/DietrichGebert/ponytail ; installer docs https://github.com/DietrichGebert/ponytail/blob/main/INSTALL.md . Ponytail = simpler code, Caveman = terse explanations.
-- Vercel skills CLI: https://github.com/vercel-labs/skills ; `-a codex -s ... -y` supported. Use `bash scripts/install-agent-skills.sh`, then verify presence under `.agents/skills` and run `/setup-matt-pocock-skills` in Codex.
+- Vercel skills CLI: https://github.com/vercel-labs/skills ; `-a claude-code --copy -s ... -y` supported. Use `bash scripts/install-agent-skills.sh`, then verify presence under `.claude/skills` and run `/setup-matt-pocock-skills` in Claude Code.
 
 ## Prompt engineering
 - OpenAI API prompting: https://developers.openai.com/api/docs/guides/prompt-engineering — clear instructions, grounding, explicit success criteria, context and tests.

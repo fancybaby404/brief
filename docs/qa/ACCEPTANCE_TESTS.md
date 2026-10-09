@@ -1,6 +1,6 @@
 # Acceptance and quality gates
 
-These are **not** claimed as passed. Codex must mark each result PASS/FAIL with evidence before asserting app completion.
+These are **not** claimed as passed. The agent must mark each result PASS/FAIL with evidence before asserting app completion.
 
 ## Build and engineering
 - `bash scripts/setup.sh`; install exact Expo-compatible native versions, no ignored install errors.

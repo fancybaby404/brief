@@ -12,7 +12,7 @@ bash scripts/setup.sh
 npm run android  # or npm run ios from macOS
 ```
 
-**3. In your agent (Codex):** Paste `prompts/INITIAL_CODEX_PROMPT.md` as the FIRST instruction. It requires the agent to read all MD files, inspect all screenshots, verify/install Matt Pocock, Ponytail and Caveman, run actual local AI and test on device.
+**3. In Claude Code:** Paste `prompts/INITIAL_PROMPT.md` as the FIRST instruction. It requires the agent to read all MD files, inspect all screenshots, verify/install Matt Pocock and Ponytail skills, run actual local AI and test on device.
 
 **4. Provide an on-device GGUF model:** Open Settings → Import GGUF. The ZIP does not contain a multi-GB model. Online job discovery is a distinct feature from local AI.
 
