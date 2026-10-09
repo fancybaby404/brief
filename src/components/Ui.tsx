@@ -1,6 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import { AccessibilityInfo, Animated, Dimensions, Easing, Image, Keyboard, Modal, PanResponder, Pressable, Text, TextInput, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { C,R,SPRING } from '../theme/tokens';
 export function Icon({name,size=20,color=C.ink}:{name:string,size?:number,color?:string}) {return <Ionicons name={name as any} size={size} color={color}/>;}
@@ -81,4 +82,29 @@ export function Sheet({visible,onClose,title,children}:{visible:boolean,onClose:
  {children}
  </Animated.View>
  </Modal>;
+}
+
+/** Menu that grows out of its trigger (transform origin = the button), critically damped; fades only with Reduce Motion. */
+export function Popover({origin,style,children}:{origin:'top right'|'bottom right',style:StyleProp<ViewStyle>,children:React.ReactNode}) {
+ const reduce=useReducedMotion();const t=useRef(new Animated.Value(0)).current;
+ useEffect(()=>{(reduce?Animated.timing(t,{toValue:1,duration:150,useNativeDriver:true}):Animated.spring(t,{toValue:1,...SPRING.ui,useNativeDriver:true})).start();},[]);
+ const scale=reduce?1:t.interpolate({inputRange:[0,1],outputRange:[0.9,1]});
+ return <Animated.View accessibilityViewIsModal style={[{position:'absolute',backgroundColor:C.white,borderRadius:18,borderWidth:1,borderColor:C.line,shadowColor:'#33446A',shadowOpacity:0.16,shadowRadius:18,elevation:13,opacity:t,transformOrigin:origin,transform:[{scale}]},style]}>{children}</Animated.View>;
+}
+
+/** iOS-style pull-down: a compact pill showing the current choice; the menu opens anchored under it. */
+export function PullDownMenu<T extends string>({label,value,options,onChange}:{label:string,value:T,options:{value:T,label:string}[],onChange:(v:T)=>void}) {
+ const ref=useRef<View>(null);const [pos,setPos]=useState<{top:number,right:number}|null>(null);
+ const current=options.find(o=>o.value===value)?.label??'';
+ const open=()=>ref.current?.measureInWindow((x,y,w,h)=>setPos({top:y+h+6,right:Dimensions.get('window').width-(x+w)}));
+ const pick=(v:T)=>{setPos(null);if(v!==value){void Haptics.selectionAsync();onChange(v);}};
+ return <>
+ <View ref={ref} collapsable={false}><Tap accessibilityRole="button" accessibilityLabel={label+', '+current} accessibilityHint="Opens a menu" hitSlop={8} onPress={open} style={{flexDirection:'row',alignItems:'center',gap:4,backgroundColor:C.pale2,borderRadius:16,paddingHorizontal:12,minHeight:32}}><Txt size={13}>{current}</Txt><Icon name="chevron-down" size={14} color={C.muted}/></Tap></View>
+ <Modal transparent visible={!!pos} animationType="none" statusBarTranslucent onRequestClose={()=>setPos(null)}>
+ <Pressable accessibilityRole="button" accessibilityLabel="Close menu" style={{flex:1}} onPress={()=>setPos(null)}/>
+ {pos&&<Popover origin="top right" style={{top:pos.top,right:pos.right,minWidth:200,paddingVertical:4}}>
+ {options.map((o,i)=><Tap key={o.value} accessibilityRole="menuitem" accessibilityState={{selected:o.value===value}} onPress={()=>pick(o.value)} style={{flexDirection:'row',alignItems:'center',minHeight:44,paddingHorizontal:12,gap:8,borderTopWidth:i?1:0,borderTopColor:C.line}}><View style={{width:20}}>{o.value===value&&<Icon name="checkmark" size={17} color={C.blue}/>}</View><Txt size={15}>{o.label}</Txt></Tap>)}
+ </Popover>}
+ </Modal>
+ </>;
 }

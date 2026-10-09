@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mapJobicyJob, jobsUrl, filterByType, DEFAULT_FILTERS } from '../src/lib/jobs.ts';
-import { progressBuckets, filterSortApplications } from '../src/lib/tracker.ts';
+import { progressBuckets, filterSortApplications, niceAxis } from '../src/lib/tracker.ts';
 import { parseJobExtraction, userContext } from '../src/lib/prompts.ts';
 
 // Shape captured from the live Jobicy v2 API on 2026-10-09.
@@ -111,4 +111,32 @@ test('userContext only includes resume text when the user allows it', () => {
 test('userContext clamps long resume text', () => {
   const ctx = userContext({ ...profile, useResumeForAI: true, resumeText: 'x'.repeat(50000) });
   assert.ok(ctx.length < 2000, String(ctx.length));
+});
+
+test('8-week range gives 8 weekly buckets', () => {
+  const now = new Date('2026-10-29T12:00:00Z').getTime();
+  const b = progressBuckets([app({ status: 'applied', appliedAt: '2026-09-11T00:00:00Z' })], now, '8w');
+  assert.equal(b.length, 8);
+  assert.deepEqual(b.map(x => x.count), [0, 1, 0, 0, 0, 0, 0, 0]);
+});
+
+test('6-month range buckets by calendar month, oldest first', () => {
+  const now = new Date(2026, 9, 29, 12).getTime(); // local Oct 29
+  const apps = [
+    app({ id: '1', status: 'applied', appliedAt: new Date(2026, 9, 3).toISOString() }),
+    app({ id: '2', status: 'offer', appliedAt: new Date(2026, 9, 20).toISOString() }),
+    app({ id: '3', status: 'applied', appliedAt: new Date(2026, 4, 15).toISOString() }), // May
+    app({ id: '4', status: 'applied', appliedAt: new Date(2026, 3, 15).toISOString() }), // April: out of range
+  ];
+  const b = progressBuckets(apps, now, '6m');
+  assert.deepEqual(b.map(x => x.label), ['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct']);
+  assert.deepEqual(b.map(x => x.count), [1, 0, 0, 0, 0, 2]);
+});
+
+test('niceAxis picks round gridlines with the top at or above the max', () => {
+  assert.deepEqual(niceAxis(28), [0, 10, 20, 30]);
+  assert.deepEqual(niceAxis(8), [0, 5, 10]);
+  assert.deepEqual(niceAxis(2), [0, 1, 2]);
+  assert.deepEqual(niceAxis(0), [0, 1, 2, 3]);
+  assert.deepEqual(niceAxis(120), [0, 50, 100, 150]);
 });

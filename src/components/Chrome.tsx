@@ -1,8 +1,8 @@
-import React,{useEffect,useRef} from 'react';
-import {Animated,Pressable,View,type ViewStyle} from 'react-native';
+import React from 'react';
+import {Pressable,View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {C,SPRING} from '../theme/tokens';
-import {Brand,Icon,Mascot,Tap,Txt,useKeyboardVisible,useReducedMotion} from './Ui';
+import {C} from '../theme/tokens';
+import {Brand,Icon,Mascot,Popover,Tap,Txt,useKeyboardVisible} from './Ui';
 import {useBrief} from '../lib/appContext';
 export function Header({plain=false,title}:{plain?:boolean,title?:string}) {
  const {back,toggleProfileMenu,go}=useBrief();
@@ -26,13 +26,6 @@ export function FloatingNav() {
  </View>
  <Tap accessibilityRole="button" accessibilityLabel={quick?'Close quick actions':'Quick actions'} accessibilityState={{expanded:quick}} onPress={toggleQuick} style={{width:60,height:62,backgroundColor:C.blue,borderRadius:19,alignItems:'center',justifyContent:'center',shadowColor:C.blue,shadowOpacity:0.25,shadowRadius:10,elevation:5}}><Icon name={quick?'close':'add'} size={31} color={C.white}/></Tap>
  </View>
-}
-/** Menu that grows out of its trigger (transform origin = the button), critically damped; fades only with Reduce Motion. */
-function Popover({origin,style,children}:{origin:'top right'|'bottom right',style:ViewStyle,children:React.ReactNode}) {
- const reduce=useReducedMotion();const t=useRef(new Animated.Value(0)).current;
- useEffect(()=>{(reduce?Animated.timing(t,{toValue:1,duration:150,useNativeDriver:true}):Animated.spring(t,{toValue:1,...SPRING.ui,useNativeDriver:true})).start();},[]);
- const scale=reduce?1:t.interpolate({inputRange:[0,1],outputRange:[0.9,1]});
- return <Animated.View accessibilityViewIsModal style={[{position:'absolute',backgroundColor:C.white,borderRadius:18,borderWidth:1,borderColor:C.line,shadowColor:'#33446A',shadowOpacity:0.16,shadowRadius:18,elevation:13,opacity:t,transformOrigin:origin,transform:[{scale}]},style]}>{children}</Animated.View>;
 }
 export function Overlays(){const {quick,profileMenu,toggleQuick,toggleProfileMenu,go,openChat,profile}=useBrief();const insets=useSafeAreaInsets();
  if(!quick&&!profileMenu)return null;

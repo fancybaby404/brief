@@ -43,6 +43,11 @@
 - `src/lib/format.ts`: provider HTML → a small stored text format (`## heading`, `• bullet`, `**bold**`, blank line between blocks). Handles real Jobicy patterns: `<h2>/<h3>`, bold-only "Overview:" paragraphs as headings, fake `·` bullet paragraphs, `<li><strong>Label:</strong>`, `<li><p>`, `<br>`, numeric entities, Unicode spaces, space-before-punctuation left by removed links. Verified on 50 live PH-filtered listings: 0 leftover tags/entities, 0 empty blocks.
 - `Description` component renders headings, hanging-indent bullets, inline bold labels, selectable 15/22 body text; "Show more" collapses on whole blocks (never mid-bullet or on a dangling heading). Used on job detail and saved application detail. The same parser tidies OCR/typed descriptions ("Requirements:", "- item", "2) item"). Tests: `tests/format.test.mjs`; `npm test` now loads `tests/ts-resolve.mjs` so modules can import each other Metro-style.
 
+### 2026-10-09 — Application progress chart
+- `ProgressChart`: y-axis with round gridlines (`niceAxis`, 1/2/5×10ⁿ steps), value labels, rounded bars with a native CSS `linear-gradient` (New Architecture `experimental_backgroundImage`, solid fallback), date labels, legend + period total, honest empty state. Bars grow in with a critically damped spring on range change (static under Reduce Motion). Whole chart has one VoiceOver/TalkBack summary label.
+- Range pull-down (`PullDownMenu`, anchored under the pill, leading checkmark, selection haptic): Last 4 weeks (weekly), Last 8 weeks (weekly, alternate labels), Last 6 months (calendar months). Counts are applications the user reported as applied or later, by `appliedAt`.
+- `Popover` moved to `Ui.tsx` and shared by the + menu, profile menu and pull-downs.
+
 ## Next tasks in order
 1. **P0**: `scripts/setup.sh` + `npm run typecheck` + Android dev build; fix dependency APIs, permissions, runtime import errors, SafeArea/keyboard collisions, design bugs.
 2. **P0**: import/test Qwen Q4 GGUF on actual target phone; run airplane-mode chat and mock; reduce prompt/context memory footprint as needed.
