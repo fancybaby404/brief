@@ -31,7 +31,8 @@ export function BriefProvider({children}:{children:React.ReactNode}) {
  const go=(p:Page)=>{setQuick(false);setProfileMenu(false);setPage(p);};
  const goTab=(t:Tab)=>{setTab(t);go(t);};
  const back=()=>go(tab);
- const putApp=async(a:Application)=>{await DB.saveApplication(a);void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);setApplications(old=>[a,...old.filter(x=>x.id!==a.id)]);setSelectedApp(a);};
+ // Haptics only for meaningful commits: success when a job is added, a tick when its status changes, nothing for edits like notes.
+ const putApp=async(a:Application)=>{const prev=applications.find(x=>x.id===a.id);await DB.saveApplication(a);if(!prev)void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);else if(prev.status!==a.status)void Haptics.selectionAsync();setApplications(old=>[a,...old.filter(x=>x.id!==a.id)]);setSelectedApp(a);};
  const removeApp=async(id:string,navigate=true)=>{await DB.deleteApplication(id);setApplications(old=>old.filter(x=>x.id!==id));if(navigate)go('applications');};
  const putEvent=async(e:Event)=>{await DB.saveEvent(e);setEvents(old=>[e,...old.filter(x=>x.id!==e.id)]);};
  const removeEvent=async(id:string)=>{await DB.deleteEvent(id);setEvents(old=>old.filter(x=>x.id!==id));};

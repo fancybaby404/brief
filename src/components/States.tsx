@@ -1,6 +1,8 @@
 // Shared empty / loading / error states. Every state says what happened, why, and offers the next step.
 import React,{useEffect,useRef,useState} from 'react';
 import {Animated,Easing,View} from 'react-native';
+import Reanimated,{FadeIn,FadeOut,withTiming,type EntryExitAnimationFunction} from 'react-native-reanimated';
+import {EASE_OUT,ROW_IN} from '../theme/motion';
 import {C} from '../theme/tokens';
 import {Card,Icon,Mascot,Primary,Tap,Txt,useReducedMotion,type Mood} from './Ui';
 import {LiveMascot} from './LiveMascot';
@@ -43,22 +45,36 @@ export function TypingDots(){
  return <View style={{flexDirection:'row',gap:6}}>{[0,1,2].map(i=><Animated.View key={i} style={{width:7,height:7,borderRadius:4,backgroundColor:C.blue,opacity:reduce?0.8:t.interpolate({inputRange:[0,0.15+i*0.15,0.4+i*0.15,1],outputRange:[0.3,1,0.3,0.3]})}}/>)}</View>;
 }
 
+// A new message rises 10 px into place (it came from the composer below); history doesn't animate.
+const MESSAGE_IN:EntryExitAnimationFunction=()=>{'worklet';return {initialValues:{opacity:0,transform:[{translateY:10}]},animations:{opacity:withTiming(1,{duration:220,easing:EASE_OUT}),transform:[{translateY:withTiming(0,{duration:220,easing:EASE_OUT})}]}};};
+const MESSAGE_FADE=FadeIn.duration(150).easing(EASE_OUT);
+const THINK_IN=FadeIn.duration(150).easing(EASE_OUT),THINK_OUT=FadeOut.duration(120).easing(EASE_OUT);
+
+/** One chat / mock message. `animate` only for messages created while the screen is open. */
+export function MessageBubble({role,text,animate,avatar=31}:{role:'user'|'assistant',text:string,animate:boolean,avatar?:number}){
+ const reduce=useReducedMotion();const mine=role==='user';
+ return <Reanimated.View entering={animate?(reduce?MESSAGE_FADE:MESSAGE_IN):undefined} style={{maxWidth:'88%',alignSelf:mine?'flex-end':'flex-start',flexDirection:'row',alignItems:'flex-end',gap:7}}>
+ {!mine&&<Mascot size={avatar}/>}
+ <View style={{backgroundColor:mine?C.blue:C.pale,padding:13,borderRadius:18,flexShrink:1}}><Txt selectable color={mine?C.white:C.ink}>{text}</Txt></View>
+ </Reanimated.View>;
+}
+
 /** Shown in the conversation while the on-device model is generating. */
 export function ThinkingBubble(){
- return <View accessible accessibilityRole="progressbar" accessibilityLabel="Brief is thinking" style={{alignSelf:'flex-start',flexDirection:'row',alignItems:'flex-end',gap:7}}>
+ return <Reanimated.View entering={THINK_IN} exiting={THINK_OUT}><View accessible accessibilityRole="progressbar" accessibilityLabel="Brief is thinking" style={{alignSelf:'flex-start',flexDirection:'row',alignItems:'flex-end',gap:7}}>
  <Mascot size={31} mood="question"/>
  <View style={{backgroundColor:C.pale,borderRadius:18,borderBottomLeftRadius:6,paddingHorizontal:16,paddingVertical:14}}><TypingDots/></View>
- </View>;
+ </View></Reanimated.View>;
 }
 
 /** An AI request failed: say so plainly and offer to retry without retyping. */
 export function InlineError({message,onRetry}:{message:string,onRetry?:()=>void}){
- return <View accessibilityRole="alert" style={{flexDirection:'row',gap:10,alignItems:'flex-start',backgroundColor:C.redSoft,borderRadius:16,padding:13}}>
+ return <Reanimated.View entering={ROW_IN} accessibilityRole="alert" style={{flexDirection:'row',gap:10,alignItems:'flex-start',backgroundColor:C.redSoft,borderRadius:16,padding:13}}>
  <Icon name="alert-circle" size={20} color={C.danger}/>
  <View style={{flex:1,gap:8}}><Txt size={14} color={C.ink} style={{lineHeight:20}}>{message}</Txt>
   {onRetry&&<Tap accessibilityRole="button" onPress={onRetry} style={{alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:5,minHeight:36}}><Icon name="refresh" size={16} color={C.blue}/><Txt bold size={14} color={C.blue}>Try again</Txt></Tap>}
  </View>
- </View>;
+ </Reanimated.View>;
 }
 
 /** null while checking, so the setup card never flashes for people who already have a model. */

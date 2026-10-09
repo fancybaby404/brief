@@ -12,6 +12,9 @@ React Native 0.86 via Expo SDK 57; TypeScript strict mode; real-device **develop
 - `src/lib/imports.ts`: native image picking, OCR, resume document picking, model copy.
 - `src/lib/ai.ts`: single local model loader, completion endpoint, persona-specific system prompts, model error propagation.
 
+## Motion & input
+`react-native-reanimated` 4 + `react-native-worklets` (UI-thread animation), `react-native-gesture-handler` (UI-thread gestures; `GestureHandlerRootView` at the root and inside each `Modal`), `react-native-keyboard-controller` (`KeyboardProvider` at the root; composers use its `KeyboardAvoidingView`). The worklets Babel plugin is added by `babel-preset-expo`. Tokens live in `src/theme/motion.ts`. Core `Animated` remains only for native-driver ambient loops (cloud, typing dots, skeleton, mascot reactions).
+
 ## Data boundary & schema
 **SQLite persisted:** applications (id, company, title, status, description, etc), calendar events, message threads and profile info (experience, skills, resume URI, extracted text), imported GGUF URI.
 

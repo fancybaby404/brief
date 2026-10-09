@@ -36,6 +36,15 @@ NO rainbow analytics cards; preserve provider logos only if legitimately availab
 - Touch targets min 44x44 pt; headings and controls should remain legible at large Dynamic Type.
 - Maximal primary visual emphasis goes to the current job/action, not to decoration. Empty-state mascot accompanied by clear CTA; no excessive motivational slogans.
 
+## Motion system (`src/theme/motion.ts`)
+- Curves: ease-out `(0.23, 1, 0.32, 1)` for entering/exiting, ease-in-out `(0.77, 0, 0.175, 1)` for on-screen movement, sheet `(0.32, 0.72, 0, 1)`. Never ease-in on UI. UI animations stay under 300 ms; exits ~20% faster than entries.
+- Springs in (duration, dampingRatio): settle `400 / 1`, snap `400 / 0.8`, sheet `300 / 0.8`. Bounce only after a finger carried momentum.
+- Gestures (sheet drag, swipe-to-interested, calendar swipe) run on the UI thread with Gesture Handler + Reanimated: start from the current value, rubber-band at edges, decide by projected momentum, hand release velocity to the spring.
+- Press feedback everywhere (`Tap`): 0.97 scale in 120 ms on touch-down.
+- Not animated on purpose: tab switches, date selection, and screens/charts on mount for screens visited many times a day. No JS-built screen push transitions (needs a native stack). No recording visuals until voice input exists.
+- Haptics: success when a job is added, selection tick on status change or menu pick, impact at the swipe threshold and mascot taps. Never per frame, never the only feedback.
+- Reduce Motion: read synchronously on first frame; movement becomes short fades, feedback stays.
+
 ## Page-specific differences
 - Dashboard: mascot left, speech bubble right, `Application progress` REAL blue bars across rolling 4 weeks, direct list `Recent applications`. **Never** an Up Next banner, rainbow 3/4 tile stats or line graph.
 - Applications: single list only (no Applications/Events segment), search + visible sort action.

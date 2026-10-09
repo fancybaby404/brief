@@ -15,8 +15,10 @@ export function ProgressChart({applications}:{applications:Application[]}) {
  const buckets=useMemo(()=>progressBuckets(applications,Date.now(),range),[applications,range]);
  const ticks=niceAxis(Math.max(0,...buckets.map(b=>b.count)));const top=ticks[ticks.length-1];
  const total=buckets.reduce((n,b)=>n+b.count,0);
- const reduce=useReducedMotion();const grow=useRef(new Animated.Value(0)).current;
- useEffect(()=>{if(reduce){grow.setValue(1);return;}grow.setValue(0);Animated.spring(grow,{toValue:1,...SPRING.ui,useNativeDriver:true}).start();},[range,reduce]);
+ const reduce=useReducedMotion();const grow=useRef(new Animated.Value(1)).current;
+ // Home is opened tens of times a day, so the bars are simply there on mount; they grow only when the user changes the range.
+ const firstRun=useRef(true);
+ useEffect(()=>{if(firstRun.current||reduce){firstRun.current=false;grow.setValue(1);return;}grow.setValue(0);Animated.spring(grow,{toValue:1,...SPRING.ui,useNativeDriver:true}).start();},[range,reduce]);
  const barW=buckets.length<=4?34:buckets.length<=6?26:18,dense=buckets.length>6;
  const rangeLabel=RANGES.find(r=>r.value===range)!.label;
  return <Card style={{padding:16}}>

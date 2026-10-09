@@ -70,6 +70,14 @@
 - Add Job: OCR/AI progress steps, inline import errors with retry, non-blocking note when AI is missing or extraction fails (OCR text kept).
 - Startup: SQLite failure shows a recoverable error screen instead of an alert over a broken app.
 
+### 2026-10-09 — animation & interaction polish (needs a new native build)
+- Audit (improve-animations) → fixes (animate-expo). New native deps: Reanimated 4.5.1, Worklets 0.10.1, Gesture Handler 2.32, Keyboard Controller 1.21.9; `CADisableMinimumFrameDurationOnPhone` for 120 Hz.
+- Sheet and swipe-to-interested moved from PanResponder (JS thread) to Gesture Handler + Reanimated with momentum projection, rubber-banding and velocity handoff; sheet close no longer uses ease-in.
+- `Tap`: scale 0.97 / 120 ms press feedback (was opacity 0.6). Popovers (+ menu, profile, pull-down) exit the way they entered; scrim fades; + rotates to ×.
+- Lists reflow with LinearTransition (skipEntering on mount); Calendar month slide by direction + swipe + Today; chat/mock messages rise in (new only), thinking/error states fade; Resume preview crossfades; Explore results fade over the skeleton; onboarding pager on Reanimated with a one-time welcome entrance.
+- Fixes: chart no longer re-animates on every Home visit; Reduce Motion correct on first frame; keyboard "will" events; haptics only for meaningful commits.
+- Verified: typecheck, 38 tests, expo-doctor 21/21, Android bundle with 24 compiled worklets. **Feel not yet verified on device.**
+
 ## Next tasks in order
 1. **P0**: `scripts/setup.sh` + `npm run typecheck` + Android dev build; fix dependency APIs, permissions, runtime import errors, SafeArea/keyboard collisions, design bugs.
 2. **P0**: import/test Qwen Q4 GGUF on actual target phone; run airplane-mode chat and mock; reduce prompt/context memory footprint as needed.

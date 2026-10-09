@@ -25,5 +25,7 @@ Gates from `ACCEPTANCE_TESTS.md`. PASS needs evidence; BLOCKED names what is mis
 | No secrets/resume/GGUF in git | PASS (2026-10-09) | `.gitignore` covers `*.gguf`, `.env`, keystores; `git status` reviewed before commit |
 
 ## Known issues to check on device
+- **Rebuild required:** Reanimated, Gesture Handler and Keyboard Controller are native modules added after build 87dd59d0. Loading the new JS into that build will fail; install a new development build first.
+- Feel-check on the slowest phone: flick the save/filter sheet down fast and slow, grab it mid-close; swipe a job left slowly past the threshold and back (haptic should tick both ways), then flick; scroll Explore vertically to confirm swipes never steal the scroll; open/close the + and profile menus rapidly; swipe calendar months.
 - Keyboard: composers rely on `KeyboardAvoidingView behavior="padding"` with offset `insets.top + 59` (header height). Verify on Android edge-to-edge and iOS.
 - Jobicy `count=40` with no pagination yet (`nextCursor` is available).

@@ -5,6 +5,8 @@ import {Card,CompanyLogo,Heading,Icon,Primary,Sheet,StatusPill,Tap,Txt} from '..
 import {SwipeAction} from '../components/SwipeAction';
 import {Description} from '../components/Description';
 import {EmptyState,JobsSkeleton} from '../components/States';
+import Reanimated from 'react-native-reanimated';
+import {ROW_IN} from '../theme/motion';
 import {fetchRemoteJobs,JobsError,DEFAULT_FILTERS,JOBICY_CREDIT_URL,type JobFilters} from '../lib/jobs';import {uid} from '../lib/db';import type {Application,ApplicationStatus,RemoteJob} from '../types';
 const REGIONS:{value:JobFilters['geo'],label:string,phrase:string}[]=[{value:'philippines',label:'Philippines',phrase:'the Philippines'},{value:'apac',label:'Asia-Pacific',phrase:'Asia-Pacific'},{value:'',label:'All regions',phrase:'any region'}];
 const TYPES:{value:JobFilters['type'],label:string}[]=[{value:'',label:'Any'},{value:'Full-Time',label:'Full-time'},{value:'Part-Time',label:'Part-time'},{value:'Contract',label:'Contract'}];
@@ -39,8 +41,8 @@ function JobCard({j,app,onOpen,onInterested,onUnmark}:{j:RemoteJob,app?:Applicat
  </View>}
  </Tap></SwipeAction>;
 }
-export function JobsScreen(){const {openJob,applications,putApp,removeApp,go}=useBrief();const [query,setQuery]=useState(''),[filters,setFilters]=useState<JobFilters>(DEFAULT_FILTERS),[draft,setDraft]=useState<JobFilters>(DEFAULT_FILTERS),[showFilters,setShowFilters]=useState(false),[jobs,setJobs]=useState<RemoteJob[]>([]),[loading,setLoading]=useState(false),[error,setError]=useState<JobsError|null>(null);
- async function refresh(q=query,f=filters){setLoading(true);setError(null);try{setJobs(await fetchRemoteJobs(q,f));}catch(e){setError(e instanceof JobsError?e:new JobsError('server',(e as Error).message));setJobs([]);}finally{setLoading(false)}}
+export function JobsScreen(){const {openJob,applications,putApp,removeApp,go}=useBrief();const [query,setQuery]=useState(''),[filters,setFilters]=useState<JobFilters>(DEFAULT_FILTERS),[draft,setDraft]=useState<JobFilters>(DEFAULT_FILTERS),[showFilters,setShowFilters]=useState(false),[jobs,setJobs]=useState<RemoteJob[]>([]),[loading,setLoading]=useState(false),[error,setError]=useState<JobsError|null>(null),[batch,setBatch]=useState(0);
+ async function refresh(q=query,f=filters){setLoading(true);setError(null);try{setJobs(await fetchRemoteJobs(q,f));setBatch(b=>b+1);}catch(e){setError(e instanceof JobsError?e:new JobsError('server',(e as Error).message));setJobs([]);}finally{setLoading(false)}}
  useEffect(()=>{void refresh();},[]);
  const filtered=filters.geo!==DEFAULT_FILTERS.geo||filters.type!==DEFAULT_FILTERS.type;
  function apply(f:JobFilters){setShowFilters(false);setFilters(f);void refresh(query,f);}
@@ -60,7 +62,7 @@ export function JobsScreen(){const {openJob,applications,putApp,removeApp,go}=us
  {!loading&&error?.kind==='offline'&&<EmptyState mood="sad" title="You’re offline" body={error.message} action={{label:'Try again',icon:'refresh',onPress:()=>void refresh()}} secondary={applications.length?{label:'Open my saved jobs',onPress:()=>go('applications')}:undefined}/>}
  {!loading&&error?.kind==='server'&&<EmptyState mood="error" title="Jobs couldn’t load" body={error.message} action={{label:'Try again',icon:'refresh',onPress:()=>void refresh()}}/>}
  {!loading&&!error&&jobs.length===0&&<EmptyState mood="question" title="No jobs found" body={`Nothing matches${query?` “${query.trim()}”`:''}${filtered?' with these filters':''} right now. Jobicy lists recent remote jobs, so try a broader keyword.`} action={filtered?{label:'Reset filters',onPress:()=>apply(DEFAULT_FILTERS)}:undefined} secondary={query?{label:'Clear search',onPress:()=>{setQuery('');void refresh('');}}:undefined}/>}
- {!loading&&jobs.map(j=><JobCard key={j.id} j={j} app={byUrl.get(j.url)} onOpen={()=>openJob(j)} onInterested={()=>void markInterested(j)} onUnmark={()=>unmark(byUrl.get(j.url)!)}/>)}
+ {!loading&&jobs.length>0&&<Reanimated.View key={batch} entering={ROW_IN} style={{gap:13}}>{jobs.map(j=><JobCard key={j.id} j={j} app={byUrl.get(j.url)} onOpen={()=>openJob(j)} onInterested={()=>void markInterested(j)} onUnmark={()=>unmark(byUrl.get(j.url)!)}/>)}</Reanimated.View>}
  </ScrollView>
  <Sheet visible={showFilters} onClose={()=>setShowFilters(false)} title="Filters"><View style={{gap:18}}>
  <Choice label="Open to applicants in" options={REGIONS} value={draft.geo} onChange={geo=>setDraft({...draft,geo})}/>

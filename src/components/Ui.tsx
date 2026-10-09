@@ -1,5 +1,10 @@
-import React,{useEffect,useRef,useState} from 'react';
-import { AccessibilityInfo, Animated, Dimensions, Easing, Image, Keyboard, Modal, PanResponder, Pressable, Text, TextInput, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
+import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import { AccessibilityInfo, Animated, Dimensions, Easing, Image, Modal, Pressable, Text, TextInput, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
+import Reanimated,{ Extrapolation, FadeIn, FadeOut, interpolate, useAnimatedStyle, useReducedMotion as useReanimatedReducedMotion, useSharedValue, withSpring, withTiming, type EntryExitAnimationFunction } from 'react-native-reanimated';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardEvents } from 'react-native-keyboard-controller';
+import { scheduleOnRN } from 'react-native-worklets';
+import { EASE_OUT, EASE_OUT_CSS, EASE_SHEET, SPRING_SHEET, project, rubberband } from '../theme/motion';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,7 +15,16 @@ export function Txt({children,size=14,bold=false,color=C.ink,style,numberOfLines
 export function Heading({children}:{children:React.ReactNode}) {return <Txt size={27} bold style={{letterSpacing:-0.6,lineHeight:33}}>{children}</Txt>}
 export function Card({children,style}:{children:React.ReactNode,style?:StyleProp<ViewStyle>}) {return <View style={[{backgroundColor:C.white,borderRadius:R.card,padding:15,borderWidth:1,borderColor:C.line},style]}>{children}</View>}
 /** Pressable with an immediate press-down highlight (feedback on touch-down, not release). */
-export function Tap({style,...p}:PressableProps) {return <Pressable {...p} style={s=>[typeof style==='function'?style(s):style,s.pressed&&{opacity:0.6}]}/>}
+const APressable=Reanimated.createAnimatedComponent(Pressable);
+const PRESS_TRANSITION={transitionProperty:'transform',transitionDuration:120,transitionTimingFunction:EASE_OUT_CSS} as const;
+/** Every pressable: 3% scale on touch-down in 120 ms (feedback on press-in, commit on release).
+ *  A CSS transition, not a worklet: it's a two-state change, and setState fires twice per press, never per frame. */
+export function Tap({style,onPressIn,onPressOut,...p}:Omit<PressableProps,'style'>&{style?:StyleProp<ViewStyle>}) {
+ const [pressed,setPressed]=useState(false);
+ return <APressable {...p} pressRetentionOffset={16}
+  onPressIn={e=>{setPressed(true);onPressIn?.(e);}} onPressOut={e=>{setPressed(false);onPressOut?.(e);}}
+  style={[style,PRESS_TRANSITION,{transform:[{scale:pressed?0.97:1}]}]}/>;
+}
 export function Primary({label,onPress,secondary=false,disabled=false,large=false,icon}:{label:string,onPress:()=>void,secondary?:boolean,disabled?:boolean,large?:boolean,icon?:string}) {const color=secondary?C.blue:C.white;return <Tap accessibilityRole="button" accessibilityLabel={label} onPress={onPress} disabled={disabled} style={{minHeight:large?54:46,justifyContent:'center',paddingHorizontal:16,backgroundColor:secondary?C.pale:C.blue,borderRadius:large?16:13,opacity:disabled?.55:1,alignItems:'center'}}><Txt color={color} bold size={large?17:14}>{label}</Txt>{!!icon&&<View style={{position:'absolute',right:18}}><Icon name={icon} size={large?20:17} color={color}/></View>}</Tap>}
 export function Input({value,onChangeText,placeholder,multiline=false}:{value:string,onChangeText:(text:string)=>void,placeholder?:string,multiline?:boolean}) {return <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={C.soft} multiline={multiline} style={{backgroundColor:C.pale2,color:C.ink,borderRadius:12,padding:12,marginTop:5,minHeight:multiline?100:45,textAlignVertical:multiline?'top':'center',fontSize:14}}/>}
 export function Field({label,value,onChangeText,placeholder,multiline}:{label:string,value:string,onChangeText:(v:string)=>void,placeholder?:string,multiline?:boolean}) {return <View style={{marginBottom:11}}><Txt size={12} color={C.muted}>{label}</Txt><Input {...{value,onChangeText,placeholder,multiline}}/></View>}
@@ -37,9 +51,10 @@ export function CompanyLogo({uri,size=40}:{uri?:string,size?:number}) {const [fa
  return uri&&!failed?<Image source={{uri}} onError={()=>setFailed(true)} resizeMode="contain" accessibilityIgnoresInvertColors style={[box,{backgroundColor:C.white,borderWidth:1,borderColor:C.line}]}/>
  :<View style={[box,{backgroundColor:C.pale2,alignItems:'center',justifyContent:'center'}]}><Icon name="briefcase-outline" color={C.blue} size={size*0.5}/></View>;}
 /** True while the software keyboard is up; the floating bar hides so it never covers a composer. */
-export function useKeyboardVisible() {const [v,setV]=useState(false);useEffect(()=>{const a=Keyboard.addListener('keyboardDidShow',()=>setV(true)),b=Keyboard.addListener('keyboardDidHide',()=>setV(false));return ()=>{a.remove();b.remove();};},[]);return v;}
-/** Follows the OS Reduce Motion setting live. */
-export function useReducedMotion() {const [r,setR]=useState(false);useEffect(()=>{void AccessibilityInfo.isReduceMotionEnabled().then(setR);const s=AccessibilityInfo.addEventListener('reduceMotionChanged',setR);return ()=>s.remove();},[]);return r;}
+/** "Will" events (both platforms via keyboard-controller) so the bar leaves as the keyboard starts, not after it lands. */
+export function useKeyboardVisible() {const [v,setV]=useState(false);useEffect(()=>{const a=KeyboardEvents.addListener('keyboardWillShow',()=>setV(true)),b=KeyboardEvents.addListener('keyboardWillHide',()=>setV(false));return ()=>{a.remove();b.remove();};},[]);return v;}
+/** Reduce Motion: correct on the first frame (Reanimated reads it synchronously), then follows changes live. */
+export function useReducedMotion() {const initial=useReanimatedReducedMotion();const [r,setR]=useState(initial);useEffect(()=>{const s=AccessibilityInfo.addEventListener('reduceMotionChanged',setR);return ()=>s.remove();},[]);return r;}
 
 /** Soft looping cloud behind the mascot. Puffs drift out of phase; static when Reduce Motion is on. */
 function Puff({d,left,top,color,period,dx,dy,still}:{d:number,left:number,top:number,color:string,period:number,dx:number,dy:number,still:boolean}) {
@@ -68,56 +83,69 @@ export function CloudHalo({size,children}:{size:number,children:React.ReactNode}
  *  Reduce Motion swaps the slide for a short cross-fade. */
 export function Sheet({visible,onClose,title,children}:{visible:boolean,onClose:()=>void,title:string,children:React.ReactNode}) {
  const H=Dimensions.get('window').height;const reduce=useReducedMotion();const insets=useSafeAreaInsets();
- const [mounted,setMounted]=useState(visible);const close=useRef(onClose);close.current=onClose;
- const ty=useRef(new Animated.Value(H)).current,fade=useRef(new Animated.Value(0)).current;
+ const [mounted,setMounted]=useState(visible);
+ const close=useRef(onClose);close.current=onClose;const callClose=useCallback(()=>close.current(),[]);
+ // y: sheet offset from its resting position (UI thread). height: measured panel height for the dismiss threshold.
+ const y=useSharedValue(H),fade=useSharedValue(0),start=useSharedValue(0),height=useSharedValue(H*0.5);
  useEffect(()=>{
   if(visible){setMounted(true);
-   if(reduce){ty.setValue(0);Animated.timing(fade,{toValue:1,duration:180,useNativeDriver:true}).start();}
-   else{fade.setValue(1);Animated.spring(ty,{toValue:0,...SPRING.sheet,useNativeDriver:true}).start();}
+   if(reduce){y.set(0);fade.set(withTiming(1,{duration:180,easing:EASE_OUT}));}
+   else{fade.set(1);y.set(withSpring(0,{duration:300,dampingRatio:1}));} // opened by a tap: no momentum, so no overshoot
   }else if(mounted){
-   const done=()=>setMounted(false);
-   if(reduce)Animated.timing(fade,{toValue:0,duration:150,useNativeDriver:true}).start(done);
-   else Animated.timing(ty,{toValue:H,duration:220,easing:Easing.in(Easing.cubic),useNativeDriver:true}).start(done);
+   const done=(finished?:boolean)=>{'worklet';if(finished)scheduleOnRN(setMounted,false);};
+   if(reduce)fade.set(withTiming(0,{duration:150,easing:EASE_OUT},done));
+   else y.set(withTiming(H,{duration:240,easing:EASE_SHEET},done));
   }},[visible]);
- const pan=useRef(PanResponder.create({
-  onMoveShouldSetPanResponder:(_,g)=>g.dy>8&&Math.abs(g.dy)>Math.abs(g.dx),
-  onPanResponderMove:(_,g)=>ty.setValue(g.dy>0?g.dy:g.dy*0.15), // rubber-band when pulled up
-  onPanResponderRelease:(_,g)=>{
-   if(g.dy>110||g.vy>0.9)close.current();
-   else Animated.spring(ty,{toValue:0,velocity:g.vy*1000,...SPRING.sheet,useNativeDriver:true}).start();
-  },
- })).current;
+ const pan=useMemo(()=>Gesture.Pan().activeOffsetY([-10,10])
+  .onStart(()=>{start.set(y.get());}) // grab mid-animation continues from where the sheet is
+  .onUpdate(e=>{const next=start.get()+e.translationY;y.set(next>=0?next:rubberband(next,height.get()));})
+  .onEnd(e=>{
+   if(y.get()+project(e.velocityY)>height.get()*0.4){ // where the flick was going, not just how far it moved
+    y.set(withSpring(H,{duration:300,dampingRatio:1,velocity:e.velocityY,overshootClamping:true},f=>{if(f)scheduleOnRN(callClose);}));
+   }else y.set(withSpring(0,{...SPRING_SHEET,velocity:e.velocityY}));
+  }),[]);
+ const backdrop=useAnimatedStyle(()=>({opacity:fade.get()*interpolate(y.get(),[0,height.get()],[1,0],Extrapolation.CLAMP)}));
+ const panel=useAnimatedStyle(()=>({opacity:fade.get(),transform:[{translateY:y.get()}]}));
  if(!mounted)return null;
- const dim=Animated.multiply(fade,ty.interpolate({inputRange:[0,H*0.5],outputRange:[1,0],extrapolate:'clamp'}));
  return <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={onClose}>
- <Animated.View style={{flex:1,backgroundColor:'rgba(9,25,45,0.3)',opacity:dim}}><Pressable accessibilityRole="button" accessibilityLabel="Close" style={{flex:1}} onPress={onClose}/></Animated.View>
- <Animated.View {...pan.panHandlers} accessibilityViewIsModal style={{position:'absolute',left:0,right:0,bottom:0,backgroundColor:C.white,borderTopLeftRadius:24,borderTopRightRadius:24,padding:18,paddingTop:8,paddingBottom:Math.max(insets.bottom,16)+4,opacity:fade,transform:[{translateY:ty}],shadowColor:'#33446A',shadowOpacity:0.15,shadowRadius:20,elevation:16}}>
+ <GestureHandlerRootView style={{flex:1}}>
+ <Reanimated.View style={[{flex:1,backgroundColor:'rgba(9,25,45,0.3)'},backdrop]}><Pressable accessibilityRole="button" accessibilityLabel="Close" style={{flex:1}} onPress={onClose}/></Reanimated.View>
+ <GestureDetector gesture={pan}>
+ <Reanimated.View accessibilityViewIsModal onLayout={e=>height.set(e.nativeEvent.layout.height)} style={[{position:'absolute',left:0,right:0,bottom:0,backgroundColor:C.white,borderTopLeftRadius:24,borderTopRightRadius:24,padding:18,paddingTop:8,paddingBottom:Math.max(insets.bottom,16)+4,shadowColor:'#33446A',shadowOpacity:0.15,shadowRadius:20,elevation:16},panel]}>
  <View style={{alignSelf:'center',width:38,height:5,borderRadius:3,backgroundColor:C.line,marginBottom:12}}/>
  <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><Txt bold size={18}>{title}</Txt><Tap accessibilityRole="button" accessibilityLabel="Close" hitSlop={14} onPress={onClose} style={{width:30,height:30,borderRadius:15,backgroundColor:C.pale2,alignItems:'center',justifyContent:'center'}}><Icon name="close" size={17} color={C.muted}/></Tap></View>
  {children}
- </Animated.View>
+ </Reanimated.View>
+ </GestureDetector>
+ </GestureHandlerRootView>
  </Modal>;
 }
 
-/** Menu that grows out of its trigger (transform origin = the button), critically damped; fades only with Reduce Motion. */
+// Popover motion: grows from its trigger (never from scale 0), leaves the way it came, ~20% faster.
+const popIn:EntryExitAnimationFunction=()=>{'worklet';return {initialValues:{opacity:0,transform:[{scale:0.92}]},animations:{opacity:withTiming(1,{duration:150,easing:EASE_OUT}),transform:[{scale:withSpring(1,{duration:300,dampingRatio:1})}]}};};
+const popOut:EntryExitAnimationFunction=()=>{'worklet';return {initialValues:{opacity:1,transform:[{scale:1}]},animations:{opacity:withTiming(0,{duration:140,easing:EASE_OUT}),transform:[{scale:withTiming(0.96,{duration:140,easing:EASE_OUT})}]}};};
+const FADE_IN=FadeIn.duration(150).easing(EASE_OUT),FADE_OUT=FadeOut.duration(120).easing(EASE_OUT);
+export const SCRIM_IN=FadeIn.duration(200).easing(EASE_OUT),SCRIM_OUT=FadeOut.duration(160).easing(EASE_OUT);
+
+/** Anchored menu. Mount/unmount it conditionally: the entering/exiting animations run on the UI thread. */
 export function Popover({origin,style,children}:{origin:'top right'|'bottom right',style:StyleProp<ViewStyle>,children:React.ReactNode}) {
- const reduce=useReducedMotion();const t=useRef(new Animated.Value(0)).current;
- useEffect(()=>{(reduce?Animated.timing(t,{toValue:1,duration:150,useNativeDriver:true}):Animated.spring(t,{toValue:1,...SPRING.ui,useNativeDriver:true})).start();},[]);
- const scale=reduce?1:t.interpolate({inputRange:[0,1],outputRange:[0.9,1]});
- return <Animated.View accessibilityViewIsModal style={[{position:'absolute',backgroundColor:C.white,borderRadius:18,borderWidth:1,borderColor:C.line,shadowColor:'#33446A',shadowOpacity:0.16,shadowRadius:18,elevation:13,opacity:t,transformOrigin:origin,transform:[{scale}]},style]}>{children}</Animated.View>;
+ const reduce=useReducedMotion();
+ return <Reanimated.View entering={reduce?FADE_IN:popIn} exiting={reduce?FADE_OUT:popOut} accessibilityViewIsModal style={[{position:'absolute',backgroundColor:C.white,borderRadius:18,borderWidth:1,borderColor:C.line,shadowColor:'#33446A',shadowOpacity:0.16,shadowRadius:18,elevation:13,transformOrigin:origin},style]}>{children}</Reanimated.View>;
 }
 
 /** iOS-style pull-down: a compact pill showing the current choice; the menu opens anchored under it. */
 export function PullDownMenu<T extends string>({label,value,options,onChange}:{label:string,value:T,options:{value:T,label:string}[],onChange:(v:T)=>void}) {
- const ref=useRef<View>(null);const [pos,setPos]=useState<{top:number,right:number}|null>(null);
+ const ref=useRef<View>(null);const [pos,setPos]=useState<{top:number,right:number}|null>(null),[open,setOpen]=useState(false);
  const current=options.find(o=>o.value===value)?.label??'';
- const open=()=>ref.current?.measureInWindow((x,y,w,h)=>setPos({top:y+h+6,right:Dimensions.get('window').width-(x+w)}));
- const pick=(v:T)=>{setPos(null);if(v!==value){void Haptics.selectionAsync();onChange(v);}};
+ const show=()=>ref.current?.measureInWindow((x,y,w,h)=>{setPos({top:y+h+6,right:Dimensions.get('window').width-(x+w)});setOpen(true);});
+ // Keep the modal up until the exit animation has played, then remove it.
+ const hide=()=>{setOpen(false);setTimeout(()=>setPos(null),160);};
+ const pick=(v:T)=>{hide();if(v!==value){void Haptics.selectionAsync();onChange(v);}};
  return <>
- <View ref={ref} collapsable={false}><Tap accessibilityRole="button" accessibilityLabel={label+', '+current} accessibilityHint="Opens a menu" hitSlop={8} onPress={open} style={{flexDirection:'row',alignItems:'center',gap:4,backgroundColor:C.pale2,borderRadius:16,paddingHorizontal:12,minHeight:32}}><Txt size={13}>{current}</Txt><Icon name="chevron-down" size={14} color={C.muted}/></Tap></View>
- <Modal transparent visible={!!pos} animationType="none" statusBarTranslucent onRequestClose={()=>setPos(null)}>
- <Pressable accessibilityRole="button" accessibilityLabel="Close menu" style={{flex:1}} onPress={()=>setPos(null)}/>
- {pos&&<Popover origin="top right" style={{top:pos.top,right:pos.right,minWidth:200,paddingVertical:4}}>
+ <View ref={ref} collapsable={false}><Tap accessibilityRole="button" accessibilityLabel={label+', '+current} accessibilityHint="Opens a menu" hitSlop={8} onPress={show} style={{flexDirection:'row',alignItems:'center',gap:4,backgroundColor:C.pale2,borderRadius:16,paddingHorizontal:12,minHeight:32}}><Txt size={13}>{current}</Txt><Icon name="chevron-down" size={14} color={C.muted}/></Tap></View>
+ <Modal transparent visible={!!pos} animationType="none" statusBarTranslucent onRequestClose={hide}>
+ <Pressable accessibilityRole="button" accessibilityLabel="Close menu" style={{flex:1}} onPress={hide}/>
+ {pos&&open&&<Popover origin="top right" style={{top:pos.top,right:pos.right,minWidth:200,paddingVertical:4}}>
  {options.map((o,i)=><Tap key={o.value} accessibilityRole="menuitem" accessibilityState={{selected:o.value===value}} onPress={()=>pick(o.value)} style={{flexDirection:'row',alignItems:'center',minHeight:44,paddingHorizontal:12,gap:8,borderTopWidth:i?1:0,borderTopColor:C.line}}><View style={{width:20}}>{o.value===value&&<Icon name="checkmark" size={17} color={C.blue}/>}</View><Txt size={15}>{o.label}</Txt></Tap>)}
  </Popover>}
  </Modal>

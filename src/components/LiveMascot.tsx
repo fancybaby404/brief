@@ -17,7 +17,9 @@ const REACTIONS:Reaction[]=[
  {face:'error',marks:'sparkle',hold:1400,haptic:Haptics.ImpactFeedbackStyle.Medium},
 ];
 const spring=(v:Animated.Value,toValue:number,stiffness:number,damping:number)=>Animated.spring(v,{toValue,stiffness,damping,mass:1,useNativeDriver:true});
-const ease=(v:Animated.Value,toValue:number,duration:number)=>Animated.timing(v,{toValue,duration,easing:Easing.inOut(Easing.quad),useNativeDriver:true});
+// Strong curves (same values as theme/motion): ease-out to leave the ground / fade, ease-in-out for on-screen wobble.
+const EASE_OUT=Easing.bezier(0.23,1,0.32,1),EASE_IN_OUT=Easing.bezier(0.77,0,0.175,1);
+const ease=(v:Animated.Value,toValue:number,duration:number,curve=EASE_IN_OUT)=>Animated.timing(v,{toValue,duration,easing:curve,useNativeDriver:true});
 
 /** Tappable mascot: squishes on touch-down, then reacts (tilt on its feet, face swap, expressive marks)
  *  and settles back to `mood`. `mood` lets screens show state (e.g. 'question' while the AI thinks).
@@ -44,7 +46,7 @@ export function LiveMascot({size,mood='happy',label='Brief, the mascot'}:{size:n
   if(!reduce){
    if(n===0)Animated.sequence([spring(rot,-11,700,28),spring(rot,0,260,9)]).start();
    else if(n===1)Animated.sequence([spring(rot,9,700,28),spring(rot,0,260,9)]).start();
-   else if(n===2)Animated.sequence([ease(hop,-size*0.13,140),spring(hop,0,500,11)]).start();
+   else if(n===2)Animated.sequence([ease(hop,-size*0.13,140,EASE_OUT),spring(hop,0,500,11)]).start();
    else Animated.sequence([12,-10,8,-6,3,0].map(d=>ease(rot,d,95))).start();
   }
   if(holdTimer.current)clearTimeout(holdTimer.current);

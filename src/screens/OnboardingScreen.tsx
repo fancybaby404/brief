@@ -1,5 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {ActivityIndicator,Alert,Animated,BackHandler,ScrollView,Switch,Text,View,useWindowDimensions,type DimensionValue} from 'react-native';
+import {ActivityIndicator,Alert,BackHandler,ScrollView,Switch,Text,View,useWindowDimensions,type DimensionValue} from 'react-native';
+import Reanimated,{Extrapolation,FadeIn,interpolate,useAnimatedRef,useAnimatedScrollHandler,useAnimatedStyle,useSharedValue,withDelay,withSpring,withTiming,type EntryExitAnimationFunction,type SharedValue} from 'react-native-reanimated';
+import {EASE_OUT,SPRING_SETTLE} from '../theme/motion';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useBrief,type AddJobIntent} from '../lib/appContext';
 import {C} from '../theme/tokens';
@@ -19,11 +21,17 @@ const Lead=({children}:{children:string})=><Txt size={17} color={C.muted} style=
 const Bar=({w,color='#E3ECF8',h=8}:{w:DimensionValue,color?:string,h?:number})=><View style={{width:w,height:h,borderRadius:h/2,backgroundColor:color}}/>;
 const Dot=()=><View style={{width:5,height:5,borderRadius:3,backgroundColor:C.blue}}/>;
 
-/** Illustration drifts a little slower than the page for depth; static with Reduce Motion. */
-function Parallax({x,i,width,children}:{x:Animated.Value,i:number,width:number,children:React.ReactNode}){
- const reduce=useReducedMotion();if(reduce)return <View>{children}</View>;
- return <Animated.View style={{transform:[{translateX:x.interpolate({inputRange:[(i-1)*width,i*width,(i+1)*width],outputRange:[width*0.18,0,-width*0.18]})}]}}>{children}</Animated.View>;
+/** Illustration drifts a little slower than the page for depth (UI thread, driven by the pager); static with Reduce Motion. */
+function Parallax({x,i,width,children}:{x:SharedValue<number>,i:number,width:number,children:React.ReactNode}){
+ const reduce=useReducedMotion();
+ const style=useAnimatedStyle(()=>reduce?{}:{transform:[{translateX:interpolate(x.get(),[(i-1)*width,i*width,(i+1)*width],[width*0.18,0,-width*0.18],Extrapolation.CLAMP)}]});
+ return <Reanimated.View style={style}>{children}</Reanimated.View>;
 }
+
+// First-run welcome (the delight budget lives here): the mascot settles up into place, sparkles follow, then the words.
+const MASCOT_IN:EntryExitAnimationFunction=()=>{'worklet';return {initialValues:{opacity:0,transform:[{translateY:14},{scale:0.96}]},animations:{opacity:withTiming(1,{duration:260,easing:EASE_OUT}),transform:[{translateY:withSpring(0,SPRING_SETTLE)},{scale:withSpring(1,SPRING_SETTLE)}]}};};
+const SPARKLES_IN:EntryExitAnimationFunction=()=>{'worklet';return {initialValues:{opacity:0,transform:[{scale:0.6}]},animations:{opacity:withDelay(180,withTiming(1,{duration:200,easing:EASE_OUT})),transform:[{scale:withDelay(180,withSpring(1,{duration:350,dampingRatio:0.8}))}]}};};
+const TEXT_IN=FadeIn.duration(260).easing(EASE_OUT).delay(240),TEXT_IN_2=FadeIn.duration(260).easing(EASE_OUT).delay(300);
 
 function Rows({rows}:{rows:{icon:string,title:string,sub:string,onPress?:()=>void}[]}){
  return <View style={{backgroundColor:C.white,borderRadius:20,borderWidth:1,borderColor:C.line,paddingHorizontal:14,...shadow,shadowOpacity:0.05}}>
@@ -38,12 +46,13 @@ function Rows({rows}:{rows:{icon:string,title:string,sub:string,onPress?:()=>voi
 }
 
 function Welcome(){
+ const reduce=useReducedMotion();const fade=FadeIn.duration(200);
  return <View style={{alignItems:'center',gap:20}}>
  <Wordmark size={44}/>
- <View><CloudHalo size={244}><LiveMascot size={176}/></CloudHalo><View style={{position:'absolute',left:4,top:16}}><Sparkles size={56}/></View></View>
+ <View><CloudHalo size={244}><Reanimated.View entering={reduce?fade:MASCOT_IN}><LiveMascot size={176}/></Reanimated.View></CloudHalo><Reanimated.View entering={reduce?fade:SPARKLES_IN} style={{position:'absolute',left:4,top:16}}><Sparkles size={56}/></Reanimated.View></View>
  <View style={{gap:10,alignItems:'center'}}>
-  <Text accessibilityRole="header" style={{fontSize:30,lineHeight:36,fontWeight:'800',letterSpacing:-0.8,color:C.ink}}>Welcome to brief</Text>
-  <Txt size={17} color={C.muted} style={{textAlign:'center',lineHeight:24,maxWidth:320}}>Track jobs, prepare for interviews, and stay organized — all in one place, with the help of AI.</Txt>
+  <Reanimated.View entering={reduce?fade:TEXT_IN}><Text accessibilityRole="header" style={{fontSize:30,lineHeight:36,fontWeight:'800',letterSpacing:-0.8,color:C.ink}}>Welcome to brief</Text></Reanimated.View>
+  <Reanimated.View entering={reduce?fade:TEXT_IN_2}><Txt size={17} color={C.muted} style={{textAlign:'center',lineHeight:24,maxWidth:320}}>Track jobs, prepare for interviews, and stay organized — all in one place, with the help of AI.</Txt></Reanimated.View>
  </View>
  </View>;
 }
@@ -91,11 +100,14 @@ function PracticeArt(){
  </View>;
 }
 
-function PageDots({x,width,index}:{x:Animated.Value,width:number,index:number}){
+/** Page indicator that tracks the finger: each dot's fill follows the pager's live scroll position. */
+function PageDot({x,i,width}:{x:SharedValue<number>,i:number,width:number}){
+ const fill=useAnimatedStyle(()=>({opacity:interpolate(x.get(),[(i-1)*width,i*width,(i+1)*width],[0,1,0],Extrapolation.CLAMP)}));
+ return <View style={{width:8,height:8,borderRadius:4,backgroundColor:'#D5E3F7'}}><Reanimated.View style={[{position:'absolute',top:0,left:0,right:0,bottom:0,borderRadius:4,backgroundColor:C.blue},fill]}/></View>;
+}
+function PageDots({x,width,index}:{x:SharedValue<number>,width:number,index:number}){
  return <View accessible accessibilityLabel={`Page ${index+1} of ${PAGES}`} style={{flexDirection:'row',justifyContent:'center',gap:10}}>
- {Array.from({length:PAGES},(_,i)=><View key={i} style={{width:8,height:8,borderRadius:4,backgroundColor:'#D5E3F7'}}>
-  <Animated.View style={{position:'absolute',top:0,left:0,right:0,bottom:0,borderRadius:4,backgroundColor:C.blue,opacity:x.interpolate({inputRange:[(i-1)*width,i*width,(i+1)*width],outputRange:[0,1,0],extrapolate:'clamp'})}}/>
- </View>)}
+ {Array.from({length:PAGES},(_,i)=><PageDot key={i} x={x} i={i} width={width}/>)}
  </View>;
 }
 
@@ -104,7 +116,8 @@ function PageDots({x,width,index}:{x:Animated.Value,width:number,index:number}){
 export function OnboardingScreen(){
  const {profile,updateProfile,finishOnboarding,openAddJob}=useBrief();
  const {width}=useWindowDimensions();const insets=useSafeAreaInsets();const reduce=useReducedMotion();
- const pager=useRef<ScrollView>(null);const x=useRef(new Animated.Value(0)).current;
+ const pager=useAnimatedRef<Reanimated.ScrollView>();const x=useSharedValue(0);
+ const onScroll=useAnimatedScrollHandler(e=>{x.set(e.contentOffset.x);});
  const [index,setIndex]=useState(0),[editing,setEditing]=useState(false),[busy,setBusy]=useState(false);
  const goTo=(i:number)=>{setIndex(i);pager.current?.scrollTo({x:i*width,animated:!reduce});};
  useEffect(()=>{const s=BackHandler.addEventListener('hardwareBackPress',()=>{if(index>0){goTo(index-1);return true;}return false;});return ()=>s.remove();},[index,width]);
@@ -125,8 +138,8 @@ export function OnboardingScreen(){
  const hasDetails=hasProfileDetails(profile)||!!profile.name;
 
  return <View style={{flex:1}}>
- <Animated.ScrollView ref={pager} horizontal pagingEnabled bounces={false} showsHorizontalScrollIndicator={false} scrollEventThrottle={16}
-  onScroll={Animated.event([{nativeEvent:{contentOffset:{x}}}],{useNativeDriver:true})}
+ <Reanimated.ScrollView ref={pager} horizontal pagingEnabled bounces={false} showsHorizontalScrollIndicator={false} scrollEventThrottle={16}
+  onScroll={onScroll}
   onMomentumScrollEnd={e=>setIndex(Math.round(e.nativeEvent.contentOffset.x/width))}>
   {page(0,<View style={{flex:1,justifyContent:'center'}}><Parallax x={x} i={0} width={width}><Welcome/></Parallax></View>)}
   {page(1,<>
@@ -165,7 +178,7 @@ export function OnboardingScreen(){
    ]}/>
    <Txt size={12} color={C.muted} style={{textAlign:'center'}}>Add an on-device model in Settings when you’re ready. Job tracking works without it.</Txt>
   </>)}
- </Animated.ScrollView>
+ </Reanimated.ScrollView>
  <View style={{paddingHorizontal:24,paddingTop:10,paddingBottom:Math.max(insets.bottom,12)+4,gap:12}}>
   <PageDots x={x} width={width} index={index}/>
   <Primary large icon="chevron-forward" label={last?'Get started':'Continue'} onPress={()=>last?void finishOnboarding():goTo(index+1)}/>

@@ -1,6 +1,8 @@
 import React,{useRef} from 'react';
 import {ActivityIndicator,StatusBar,View} from 'react-native';
 import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
+import {KeyboardProvider} from 'react-native-keyboard-controller';
 import {useFonts} from 'expo-font';
 import {Fredoka_700Bold} from '@expo-google-fonts/fredoka/700Bold';
 import {BriefProvider,useBrief} from './src/lib/appContext';
@@ -37,4 +39,5 @@ function Shell(){const {page,ready,storageError,retryStorage}=useBrief();
  </>}
  </SafeAreaView>;
 }
-export default function App(){return <SafeAreaProvider><BriefProvider><Shell/></BriefProvider></SafeAreaProvider>}
+// Gesture handler and keyboard-controller roots wrap everything once; gestures silently do nothing without them.
+export default function App(){return <GestureHandlerRootView style={{flex:1}}><KeyboardProvider><SafeAreaProvider><BriefProvider><Shell/></BriefProvider></SafeAreaProvider></KeyboardProvider></GestureHandlerRootView>}

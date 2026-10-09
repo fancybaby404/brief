@@ -1,15 +1,17 @@
 import React,{useEffect,useState,useRef} from 'react';
-import {KeyboardAvoidingView,ScrollView,TextInput,View} from 'react-native';
+import {ScrollView,TextInput,View} from 'react-native';
+import {KeyboardAvoidingView} from 'react-native-keyboard-controller';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useBrief} from '../lib/appContext';import {uid,saveMessage,listMessages} from '../lib/db';import {mockInterview,MODEL_MISSING} from '../lib/ai';import {C} from '../theme/tokens';
 import {LiveMascot} from '../components/LiveMascot';
-import {EmptyState,InlineError,ModelSetupCard,ThinkingBubble,useModelInstalled} from '../components/States';
+import {EmptyState,InlineError,MessageBubble,ModelSetupCard,ThinkingBubble,useModelInstalled} from '../components/States';
 import {hasProfileDetails} from '../lib/profile';
 import {CloudHalo,CompanyLogo,Icon,Mascot,StatusPill,Tap,Txt,useKeyboardVisible} from '../components/Ui';import type {Message} from '../types';
 const BEGIN='Begin the interview with your first question.';
 const FINISH='Please end this interview and give me specific overall feedback.';
 export function MockScreen(){const {applications,profile,mockJob:job,openMock,go,goTab}=useBrief();const [messages,setMessages]=useState<Message[]>([]),[value,setValue]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');const scroll=useRef<ScrollView>(null);
  const insets=useSafeAreaInsets();const kb=useKeyboardVisible();
+ const openedAt=useRef(new Date().toISOString()).current; // messages newer than this animate in; history doesn't
  const installed=useModelInstalled();const noModel=installed===false||error===MODEL_MISSING;
  const thread=job?'mock:'+job.id:'';
  useEffect(()=>{setError('');if(thread)void listMessages(thread).then(setMessages);else setMessages([]);},[thread]);
@@ -34,7 +36,7 @@ export function MockScreen(){const {applications,profile,mockJob:job,openMock,go
  <Tap accessibilityRole="button" onPress={()=>openMock(null)} style={{alignSelf:'center',padding:8}}><Txt color={C.blue} size={12}>‹ Change job · {job.title} at {job.company}</Txt></Tap>
  <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" onContentSizeChange={()=>scroll.current?.scrollToEnd({animated:true})} contentContainerStyle={{flexGrow:1,justifyContent:'flex-end',gap:9,padding:15,paddingBottom:14}}>
  {messages.length===0&&!noModel&&<Tap accessibilityRole="button" onPress={()=>void send(BEGIN)} style={{backgroundColor:C.pale,padding:14,borderRadius:17}}><Txt bold>Ready to practice?</Txt><Txt color={C.muted}>Tap to get your first question. Everything runs on your phone.</Txt></Tap>}
- {messages.filter(m=>m.content!==BEGIN).map(m=><View key={m.id} style={{alignSelf:m.role==='user'?'flex-end':'flex-start',maxWidth:'87%',flexDirection:'row',gap:6,alignItems:'flex-end'}}>{m.role==='assistant'&&<Mascot size={29}/>}<View style={{padding:13,backgroundColor:m.role==='user'?C.blue:C.pale,borderRadius:16,flexShrink:1}}><Txt selectable color={m.role==='user'?C.white:C.ink}>{m.content===FINISH?'Finish and give me feedback.':m.content}</Txt></View></View>)}
+ {messages.filter(m=>m.content!==BEGIN).map(m=><MessageBubble key={m.id} role={m.role} avatar={29} text={m.content===FINISH?'Finish and give me feedback.':m.content} animate={m.createdAt>openedAt}/>)}
  {busy&&<ThinkingBubble/>}
  {noModel&&<ModelSetupCard feature="Mock interview practice" onOpenSettings={()=>go('settings')}/>}
  {!!error&&!noModel&&<InlineError message={error} onRetry={retry}/>}

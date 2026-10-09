@@ -1,12 +1,14 @@
-import React,{useEffect,useRef,useState} from 'react';import {KeyboardAvoidingView,ScrollView,TextInput,View} from 'react-native';
+import React,{useEffect,useRef,useState} from 'react';import {ScrollView,TextInput,View} from 'react-native';
+import {KeyboardAvoidingView} from 'react-native-keyboard-controller';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useBrief} from '../lib/appContext';import {uid,listMessages,saveMessage} from '../lib/db';import {askBrief,MODEL_MISSING} from '../lib/ai';import {C} from '../theme/tokens';import {Heading,Icon,Mascot,Txt,useKeyboardVisible,Tap} from '../components/Ui';import type {Message} from '../types';
 import {LiveMascot} from '../components/LiveMascot';
-import {InlineError,ModelSetupCard,ThinkingBubble,useModelInstalled} from '../components/States';
+import {InlineError,MessageBubble,ModelSetupCard,ThinkingBubble,useModelInstalled} from '../components/States';
 const CHIPS=['What should I ask?','Is this a red flag?','Am I qualified?'];
 export function ChatScreen(){const {profile,applications,chatJob,go}=useBrief();const thread=chatJob?'job:'+chatJob.id:'general';
  const [messages,setMessages]=useState<Message[]>([]),[entry,setEntry]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');const scroll=useRef<ScrollView>(null);
  const insets=useSafeAreaInsets();const kb=useKeyboardVisible();
+ const openedAt=useRef(new Date().toISOString()).current; // messages newer than this animate in; history doesn't
  const installed=useModelInstalled();const noModel=installed===false||error===MODEL_MISSING;
  useEffect(()=>{setError('');void listMessages(thread).then(setMessages);},[thread]);
  /** Asks the on-device model to answer `q` given the conversation before it (shared by send and retry). */
@@ -22,7 +24,7 @@ export function ChatScreen(){const {profile,applications,chatJob,go}=useBrief();
   <Txt bold size={17} style={{textAlign:'center'}}>{chatJob?'Ask about this job':'Ask me about your job hunt'}</Txt>
   <Txt size={14} color={C.muted} style={{textAlign:'center',lineHeight:20}}>{chatJob?'Red flags, what to ask HR, or whether you’re a fit — answers use this job’s description.':'Your saved jobs, red flags, your resume, or interview prep.'} Your messages stay on this phone.</Txt>
  </View>}
- {messages.map(m=><View key={m.id} style={{maxWidth:'88%',alignSelf:m.role==='user'?'flex-end':'flex-start',flexDirection:'row',alignItems:'flex-end',gap:7}}>{m.role==='assistant'&&<Mascot size={31}/>}<View style={{backgroundColor:m.role==='user'?C.blue:C.pale,padding:13,borderRadius:18,flexShrink:1}}><Txt selectable color={m.role==='user'?C.white:C.ink}>{m.content}</Txt></View></View>)}
+ {messages.map(m=><MessageBubble key={m.id} role={m.role} text={m.content} animate={m.createdAt>openedAt}/>)}
  {busy&&<ThinkingBubble/>}
  {noModel&&<ModelSetupCard feature="Ask Brief" onOpenSettings={()=>go('settings')}/>}
  {!!error&&!noModel&&<InlineError message={error} onRetry={retry}/>}
