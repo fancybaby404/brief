@@ -32,6 +32,13 @@
 - **Navigation/UX:** Android hardware back (overlay → tab root → Home → exit); floating bar hides while the keyboard is up; chat/mock composers use `KeyboardAvoidingView` `padding` on both platforms (Android is edge-to-edge in SDK 57, so `adjustResize` alone does not lift content) — **needs device check**; job detail save options are a real `Modal` sheet (was absolutely positioned inside scroll content); "Practice mock interview" opens Mock with that job; missing model shows an Open Settings button; haptic on save.
 - **Files:** model and resume imports move (not copy) the picker's cached file, avoiding a second ~1 GB copy; removing/replacing a resume deletes the stored file.
 
+### 2026-10-09 — design feedback round 1 (JS only, no native rebuild)
+- **Cloud halo** (`CloudHalo` in `Ui.tsx`) behind the mascot on Home and Mock (picker + session): overlapping puffs drifting out of phase, native-driver loop, static under Reduce Motion. Built as an animated view rather than a GIF: GIF has 1-bit transparency (jagged edges on a soft cloud), can't follow Reduce Motion, and animated GIF on Android would need a new native module + rebuild. Mascot slightly smaller (Home 120→104, Mock picker 160→140).
+- **Explore:** defaults to Jobicy `geo=philippines` (remote jobs open to PH applicants: Philippines, APAC, Anywhere — verified live). Subtle filters button → sheet with region (Philippines / Asia-Pacific / All) and job type (filtered on-device; Jobicy has no type param). Search clear button. Explore stays mounted once visited, so query, filters, results and scroll survive job detail and tab switches.
+- **Company logos:** Jobicy `companyLogo` (all raster PNG/JPG/WebP in sampled feed) shown in Explore, job detail, and saved applications (`logoUrl`); falls back to a neutral briefcase tile when missing/offline. Manual jobs never get a guessed logo.
+- **Job detail:** long descriptions collapse to 9 lines with Show more / Show less.
+- **iOS feel:** `Tap` gives touch-down highlight on every control; `Sheet` springs up (ratio 0.85 / 0.3 s), drag-down or tap-out dismisses, rubber-bands when pulled up, cross-fades under Reduce Motion; menus grow from their trigger (critically damped); large titles use negative tracking; 44 pt header targets.
+
 ## Next tasks in order
 1. **P0**: `scripts/setup.sh` + `npm run typecheck` + Android dev build; fix dependency APIs, permissions, runtime import errors, SafeArea/keyboard collisions, design bugs.
 2. **P0**: import/test Qwen Q4 GGUF on actual target phone; run airplane-mode chat and mock; reduce prompt/context memory footprint as needed.

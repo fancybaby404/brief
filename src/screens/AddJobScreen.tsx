@@ -1,7 +1,7 @@
 import React,{useState} from 'react';
-import {ActivityIndicator,Alert,Pressable,ScrollView,View} from 'react-native';
+import {ActivityIndicator,Alert,ScrollView,View} from 'react-native';
 import {useBrief} from '../lib/appContext';import {C} from '../theme/tokens';
-import {Card,Field,Heading,Icon,Primary,Txt} from '../components/Ui';import {uid} from '../lib/db';
+import {Card,Field,Heading,Icon,Primary,Txt,Tap} from '../components/Ui';import {uid} from '../lib/db';
 import {pickJobImage,recognizeJobImage} from '../lib/imports';import {extractJob} from '../lib/ai';import type {ApplicationStatus} from '../types';
 export function AddJobScreen(){const {putApp,go}=useBrief();
  const [company,setCompany]=useState(''),[title,setTitle]=useState(''),[location,setLocation]=useState(''),[salary,setSalary]=useState(''),[employmentType,setEmploymentType]=useState(''),[description,setDescription]=useState(''),[url,setUrl]=useState(''),[status,setStatus]=useState<ApplicationStatus>('saved'),[busy,setBusy]=useState(false),[ocrText,setOcrText]=useState('');
@@ -14,7 +14,7 @@ export function AddJobScreen(){const {putApp,go}=useBrief();
  <View style={{flexDirection:'row',gap:9}}><View style={{flex:1}}><Primary secondary label="From photo library" onPress={()=>void imageImport()}/></View><View style={{flex:1}}><Primary secondary label="Take photo" onPress={()=>void imageImport(true)}/></View></View>
  {busy&&<ActivityIndicator size="large" color={C.blue}/>} {!!ocrText&&<Txt size={11} color={C.green}>Screenshot text extracted. Please review all fields before saving.</Txt>}
  <Card><Field label="Company *" value={company} onChangeText={setCompany} placeholder="e.g. Notion"/><Field label="Position *" value={title} onChangeText={setTitle} placeholder="e.g. Product Manager"/><Field label="Location" value={location} onChangeText={setLocation}/><Field label="Salary (optional)" value={salary} onChangeText={setSalary}/><Field label="Employment type" value={employmentType} onChangeText={setEmploymentType}/><Field label="Source URL (optional)" value={url} onChangeText={setUrl} placeholder="https://..."/><Field label="Job description / original screenshot text" value={description} onChangeText={setDescription} multiline/></Card>
- <Card><Txt bold>Have you applied already?</Txt><View style={{flexDirection:'row',flexWrap:'wrap',gap:8,marginTop:13}}>{(['saved','interested','applied','interview','under_review'] as const).map(s=><Pressable key={s} onPress={()=>setStatus(s)} style={{padding:10,backgroundColor:status===s?C.blue:C.pale,borderRadius:17}}><Txt color={status===s?C.white:C.blue} size={12}>{s.replace('_',' ')}</Txt></Pressable>)}</View></Card>
+ <Card><Txt bold>Have you applied already?</Txt><View style={{flexDirection:'row',flexWrap:'wrap',gap:8,marginTop:13}}>{(['saved','interested','applied','interview','under_review'] as const).map(s=><Tap key={s} onPress={()=>setStatus(s)} style={{padding:10,backgroundColor:status===s?C.blue:C.pale,borderRadius:17}}><Txt color={status===s?C.white:C.blue} size={12}>{s.replace('_',' ')}</Txt></Tap>)}</View></Card>
  <Primary label="Save to applications" onPress={()=>void save()}/>
  </ScrollView>;
 }

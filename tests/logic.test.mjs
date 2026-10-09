@@ -1,7 +1,7 @@
 // Pure-logic tests. Node 24 strips TS types, so these import src modules directly.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mapJobicyJob, htmlToText } from '../src/lib/jobs.ts';
+import { mapJobicyJob, htmlToText, jobsUrl, filterByType, DEFAULT_FILTERS } from '../src/lib/jobs.ts';
 import { progressBuckets, filterSortApplications } from '../src/lib/tracker.ts';
 import { parseJobExtraction, userContext } from '../src/lib/prompts.ts';
 
@@ -34,6 +34,27 @@ test('keeps canonical Jobicy URL, id, title, company and geography', () => {
 
 test('htmlToText keeps paragraph/list structure and decodes entities', () => {
   assert.equal(htmlToText(jobicy.jobDescription), 'About us\nWe build tools & things ’n stuff.\n• One\n• Two');
+});
+
+test('keeps the provider company logo and tidies multi-region locations', () => {
+  const j = mapJobicyJob({ ...jobicy, jobGeo: 'APAC,  EMEA,  USA' });
+  assert.equal(j.logo, 'https://x/logo.png');
+  assert.equal(j.location, 'APAC, EMEA, USA');
+  assert.equal(mapJobicyJob({ ...jobicy, companyLogo: undefined }).logo, '');
+});
+
+test('job search defaults to the Philippines and adds keywords', () => {
+  assert.equal(DEFAULT_FILTERS.geo, 'philippines');
+  assert.equal(jobsUrl('', DEFAULT_FILTERS), 'https://jobicy.com/api/v2/remote-jobs?count=50&geo=philippines');
+  assert.equal(jobsUrl(' ux design ', DEFAULT_FILTERS), 'https://jobicy.com/api/v2/remote-jobs?count=50&geo=philippines&tag=ux%20design');
+  assert.equal(jobsUrl('', { ...DEFAULT_FILTERS, geo: '' }), 'https://jobicy.com/api/v2/remote-jobs?count=50');
+});
+
+test('job type filter matches any listed type, empty means all', () => {
+  const jobs = [mapJobicyJob(jobicy), mapJobicyJob({ ...jobicy, id: 2, jobType: ['Part-Time'] })];
+  assert.equal(filterByType(jobs, '').length, 2);
+  assert.deepEqual(filterByType(jobs, 'Contract').map(j => j.id), ['152819']);
+  assert.deepEqual(filterByType(jobs, 'Part-Time').map(j => j.id), ['2']);
 });
 
 const app = (over) => ({ id: 'a', company: 'Acme', title: 'Dev', status: 'saved', location: '', salary: '', employmentType: '', description: '', sourceUrl: '', createdAt: '2026-10-01T00:00:00.000Z', appliedAt: null, notes: '', ...over });

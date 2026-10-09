@@ -29,18 +29,27 @@ const list = (v: unknown) => (Array.isArray(v) ? v : v ? [v] : []).map(String).j
 export function mapJobicyJob(j: any): RemoteJob {
   return {
     id: String(j.id), company: j.companyName || 'Company not listed', title: j.jobTitle || 'Untitled role',
-    location: j.jobGeo || 'Remote', salary: salary(j), employmentType: list(j.jobType),
-    description: htmlToText(j.jobDescription || ''), url: j.url || '',
+    location: String(j.jobGeo || 'Remote').replace(/\s*,\s*/g, ', '), salary: salary(j), employmentType: list(j.jobType),
+    description: htmlToText(j.jobDescription || ''), url: j.url || '', logo: j.companyLogo || '',
   };
 }
 
-export async function fetchRemoteJobs(query = ''): Promise<RemoteJob[]> {
-  const url = 'https://jobicy.com/api/v2/remote-jobs?count=40' + (query.trim() ? '&tag=' + encodeURIComponent(query.trim()) : '');
+/** geo is a Jobicy geoSlug ('' = all regions); type is matched on-device (the API has no type filter). */
+export type JobFilters = { geo: 'philippines' | 'apac' | ''; type: '' | 'Full-Time' | 'Part-Time' | 'Contract' };
+export const DEFAULT_FILTERS: JobFilters = { geo: 'philippines', type: '' };
+export function jobsUrl(query: string, f: JobFilters) {
+  return 'https://jobicy.com/api/v2/remote-jobs?count=50' + (f.geo ? '&geo=' + f.geo : '') + (query.trim() ? '&tag=' + encodeURIComponent(query.trim()) : '');
+}
+export const filterByType = (jobs: RemoteJob[], type: JobFilters['type']) =>
+  type ? jobs.filter(j => j.employmentType.split(', ').includes(type)) : jobs;
+
+export async function fetchRemoteJobs(query = '', filters: JobFilters = DEFAULT_FILTERS): Promise<RemoteJob[]> {
+  const url = jobsUrl(query, filters);
   let r: Response;
   try { r = await fetch(url, { headers: { Accept: 'application/json' } }); }
   catch { throw new Error("You're offline. Job discovery needs internet; your saved jobs still work."); }
   if (!r.ok) throw new Error(`Job discovery unavailable (HTTP ${r.status}). Your saved jobs still work offline.`);
   const data = await r.json();
   if (data.success === false) throw new Error(data.error || 'Could not load jobs');
-  return (Array.isArray(data.jobs) ? data.jobs : []).map(mapJobicyJob);
+  return filterByType((Array.isArray(data.jobs) ? data.jobs : []).map(mapJobicyJob), filters.type);
 }

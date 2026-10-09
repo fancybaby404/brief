@@ -1,6 +1,6 @@
 import React,{useState} from 'react';
-import {Alert,Pressable,ScrollView,View} from 'react-native';import {useBrief} from '../lib/appContext';
-import {C} from '../theme/tokens';import {Field,Heading,Mascot,Primary,Txt} from '../components/Ui';import {pickResume,readResumeText} from '../lib/imports';
+import {Alert,ScrollView,View} from 'react-native';import {useBrief} from '../lib/appContext';
+import {C} from '../theme/tokens';import {Field,Heading,Mascot,Primary,Txt,Tap} from '../components/Ui';import {pickResume,readResumeText} from '../lib/imports';
 export function OnboardingScreen(){const {profile,updateProfile,finishOnboarding}=useBrief();const [name,setName]=useState(''),[experience,setExperience]=useState(''),[skills,setSkills]=useState(''),[step,setStep]=useState(0);
  async function skip(){await updateProfile({...profile,name:name.trim()||'job hunter',experience,skills});await finishOnboarding();}
  async function upload(){try{const uri=await pickResume();if(!uri)return;let resumeText='';if(uri.endsWith('.pdf'))try{resumeText=await readResumeText(uri);}catch{}await updateProfile({...profile,name:name.trim()||'job hunter',experience,skills,resumeUri:uri,useResumeForAI:true,resumeText});await finishOnboarding();}catch(e){Alert.alert('Could not attach resume',String(e));}}
