@@ -17,3 +17,13 @@ This repo builds **Brief**, a privacy-first React Native/Expo iOS-style job trac
 - Respect privacy. Never commit user resumes, private keys, .gguf models, or test personal information. Never log resume text or chat prompts in production.
 - No direct `npm install` version guessing: use `npx expo install` to align Expo-compatible native package versions, `npx expo-doctor` after changes, and test on a development build rather than Expo Go.
 - Before finishing any feature: verify screen navigation, empty/loading/error/offline states, save/relaunch persistence, device safe areas, keyboard overlap, accessibility targets, and typecheck.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live in GitHub Issues (fancybaby404/brief), via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: root `GLOSSARY.md` + `docs/adr/`. See `docs/agents/domain.md`.
