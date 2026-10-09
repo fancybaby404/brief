@@ -8,6 +8,11 @@ export async function pickJobImage(camera=false):Promise<string|null> {
   const res=camera?await ImagePicker.launchCameraAsync({quality:0.85}):await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],quality:0.85});
   return res.canceled?null:res.assets[0]?.uri||null;
 }
+/** Image picked from the document/Files picker rather than the photo library. */
+export async function pickImageFile():Promise<string|null> {
+  const res=await DocumentPicker.getDocumentAsync({type:'image/*',copyToCacheDirectory:true});
+  return res.canceled||!res.assets?.length?null:res.assets[0].uri;
+}
 export async function recognizeJobImage(uri:string):Promise<string> {
   const {recognizeText}=await import('expo-ocr-kit');
   const res=await recognizeText(uri);
@@ -44,12 +49,22 @@ export async function readJobListing(url:string):Promise<{url:string,text:string
   }finally{clearTimeout(timeout);}
 }
 export async function pickResume():Promise<string|null> {
-  const res=await DocumentPicker.getDocumentAsync({type:['application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document'],copyToCacheDirectory:true});
+  const res=await DocumentPicker.getDocumentAsync({type:['application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document','image/*'],copyToCacheDirectory:true});
   if(res.canceled || !res.assets?.length)return null;
-  const src=res.assets[0].uri;const ext=res.assets[0].name?.toLowerCase().endsWith('.docx')?'docx':'pdf';
+  const asset=res.assets[0],mime=asset.mimeType?.toLowerCase()||'';
+  const ext=asset.name?.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1]||({ 'application/pdf':'pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document':'docx','image/jpeg':'jpg','image/png':'png','image/webp':'webp' } as Record<string,string>)[mime];
+  if(!['pdf','docx','jpg','jpeg','png','webp'].includes(ext||''))throw new Error('Choose a PDF, DOCX, or JPG/PNG/WEBP resume image.');
   if(!FileSystem.documentDirectory) throw new Error('Private document storage is unavailable');
-  const dest=FileSystem.documentDirectory+'resume.'+ext;
-  await FileSystem.deleteAsync(dest,{idempotent:true});await FileSystem.moveAsync({from:src,to:dest});return dest;
+  const dest=FileSystem.documentDirectory+`resume-${Date.now()}.${ext}`;
+  try{
+    await FileSystem.copyAsync({from:asset.uri,to:dest});
+    const info=await FileSystem.getInfoAsync(dest);
+    if(!info.exists||info.size===0)throw new Error('The copied file is empty.');
+    return dest;
+  }catch(error){
+    await FileSystem.deleteAsync(dest,{idempotent:true}).catch(()=>{});
+    throw new Error(`Brief couldn’t copy this file into private storage. ${(error as Error).message||''}`.trim());
+  }
 }
 export async function pickModel():Promise<string|null> {
   const res=await DocumentPicker.getDocumentAsync({type:'*/*',copyToCacheDirectory:true});
@@ -130,21 +145,30 @@ export async function probeImageUri():Promise<string> {
 }
 
 export async function readResumeText(uri:string):Promise<string> {
- if (!uri.toLowerCase().endsWith('.pdf')) return '';
+ const lower=uri.toLowerCase();
+ if (/\.(jpe?g|png|webp)$/.test(lower)){
+  const {recognizeText}=await import('expo-ocr-kit');
+  const result=await recognizeText(uri),text=result.text.trim();
+  if(!text)throw new Error('No text was found in this resume image. Choose a clearer image or enter your details manually.');
+  return text.slice(0,14000);
+ }
+ if (!lower.endsWith('.pdf')) return '';
  const { extractText, isAvailable } = await import('expo-pdf-text-extract');
  if(!isAvailable()) throw new Error('Resume extraction requires a native development build.');
  return (await extractText(uri)).slice(0,14000);
 }
 export async function deleteLocalFile(uri:string) { if(uri) await FileSystem.deleteAsync(uri,{idempotent:true}); }
-/** Picks a resume, stores it privately, extracts digital-PDF text when possible, and removes a replaced file.
- *  Returns the profile changes plus an honest note when text couldn't be read (DOCX / scanned PDF), or null if cancelled. */
-export async function importResume(currentUri:string):Promise<{resumeUri:string,resumeText:string,note:string}|null> {
+/** Picks and privately copies a resume, then extracts local text where supported. */
+export async function importResume():Promise<{resumeUri:string,resumeText:string,note:string}|null> {
  const uri=await pickResume();if(!uri)return null;
  let resumeText='',note='';
- if(uri.endsWith('.pdf')){
-  try{resumeText=await readResumeText(uri);}catch{note='Your PDF is saved, but its text couldn’t be read on this device.';}
-  if(!resumeText&&!note)note='This PDF looks scanned, so there’s no text to read.';
+ if(uri.toLowerCase().endsWith('.pdf')||/\.(jpe?g|png|webp)$/i.test(uri)){
+  try{resumeText=await readResumeText(uri);}catch(error){
+   const message=(error as Error).message||'';
+   const nativeBuild=/native development build|native module|ExpoOcrKit|ExpoPdfTextExtract|Expo Go/i.test(message);
+   note=nativeBuild?'Your resume is saved. Reading it requires the Brief development build.':'Your resume is saved, but its text couldn’t be read on this device.';
+  }
+  if(!resumeText&&!note)note=uri.toLowerCase().endsWith('.pdf')?'This PDF looks scanned, so there’s no embedded text to read. Choose a resume image or enter your details manually.':'No text was found in this resume image. Choose a clearer image or enter your details manually.';
  }else note='Your DOCX is saved. Reading DOCX text isn’t supported yet.';
- if(currentUri&&currentUri!==uri)await deleteLocalFile(currentUri);
  return {resumeUri:uri,resumeText,note};
 }

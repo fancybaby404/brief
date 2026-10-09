@@ -47,7 +47,7 @@ Open **Settings → On-device AI** and tap **Download model** to install the opt
 - Mock: select a saved application, text Q&A with local AI, end-with-feedback
 - Ask Brief: offline model chat with contextual saved application, resume summary and recent message history
 - Profile menu: profile icon top right → Resume / Notifications / Settings
-- Resume: local PDF/DOCX import; local PDF text extraction for digital PDF if supported; manually editable skills/education/experience; visual summary and OS open/share
+- Resume: local PDF/DOCX/image import; digital PDF text extraction or on-device OCR for resume images; optional local GGUF extraction into editable profile fields; visual summary and OS open/share
 - Settings: local .gguf import and testing
 - Bottom: white floating four-destination pill (Home / Jobs / Calendar / Mock) plus **separate** blue square rounded +. Popup is ~half screen width; its root is **Add Job / Ask Brief**, and Add Job expands in place to Camera / Photo, Paste job link, or Enter manually.
 
@@ -55,7 +55,7 @@ Open **Settings → On-device AI** and tap **Download model** to install the opt
 
 1. Online job discovery uses a **public remote listings feed**, not all Philippine jobs and not company application submission. Swap in a properly licensed Philippine jobs API as available.
 2. Resume preview in source is a **visual summary**, not a true inline PDF renderer. OS file opening is supported; implementation needed for full PDF preview (see follow-ups).
-3. PDF text extractor handles **digital PDF text**, not scanned PDFs; DOCX imported but not parsed in this starter. Editable career summary works immediately and is included in AI context.
+3. PDF text extraction handles **digital PDF text**, not scanned PDF pages; DOCX is stored but not parsed. Resume images use on-device OCR. When a local model is installed, extracted text can fill editable profile fields. These native features require a development build; Expo Go only supports storing the selected file and manual entry.
 4. Local LLM needs a downloaded and supported GGUF plus physical-device performance testing. CPU first; tune hardware-specific layers.
 5. Mock supports **offline voice** (Whisper STT via whisper.rn + on-device platform TTS) after downloading the speech models in Settings, and falls back to typing otherwise. **Not yet tested on a device** — see `MULTIMODAL_AI_VOICE_VERIFICATION.md`.
 6. Event reminders are scheduled as local notifications (expo-notifications); delivery is not yet verified on a device.

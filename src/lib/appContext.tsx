@@ -24,7 +24,7 @@ type AppState={
  chatJob:Application|null;openChat:(job?:Application|null)=>void;
  mockJob:Application|null;mockSetup:MockSetup;openMock:(job:Application|null,setup?:MockSetup)=>void;
  quick:boolean;toggleQuick:()=>void;profileMenu:boolean;toggleProfileMenu:()=>void;
- currency:string;setCurrency:(c:string)=>Promise<void>;timeFormat:TimeFormat;setTimeFormat:(format:TimeFormat)=>Promise<void>;fx:CachedRates|null;fxError:string;refreshFx:()=>Promise<void>;money:(x:{pay?:Pay,salary:string})=>string;
+ currency:string;setCurrency:(c:string)=>Promise<void>;timeFormat:TimeFormat;setTimeFormat:(format:TimeFormat)=>Promise<void>;fx:CachedRates|null;fxError:string;refreshFx:()=>Promise<{ok:boolean,error?:string}>;money:(x:{pay?:Pay,salary:string})=>string;
  toast:Toast|null;showToast:(message:string,action?:Toast['action'])=>void;
  ready:boolean;storageError:string;retryStorage:()=>void;finishOnboarding:(next?:Page)=>Promise<void>;replayOnboarding:()=>Promise<void>;
  addJobIntent:AddJobIntent|null;openAddJob:(intent:AddJobIntent)=>void;closeAddJob:()=>void;
@@ -44,9 +44,9 @@ export function BriefProvider({children}:{children:React.ReactNode}) {
  // Salary display currency. Rates are cached in SQLite (works offline) and refreshed in the background when stale.
  const [currency,setCurrencyState]=useState('PHP'),[fx,setFx]=useState<CachedRates|null>(null),[fxError,setFxError]=useState('');
  const [timeFormat,setTimeFormatState]=useState<TimeFormat>('12h');
- const refreshFx=async()=>{try{setFx(await refreshRates());setFxError('');}catch(e){setFxError((e as Error).message);}};
- const setCurrency=async(c:string)=>{setCurrencyState(c);await DB.setPref('currency',c);if(c!=='original'&&!fx)void refreshFx();};
- const setTimeFormat=async(format:TimeFormat)=>{setTimeFormatState(format);await DB.setPref('timeFormat',format);};
+ const refreshFx=async():Promise<{ok:boolean,error?:string}>=>{try{setFx(await refreshRates());setFxError('');return {ok:true};}catch(e){const error=(e as Error).message;setFxError(error);return {ok:false,error};}};
+ const setCurrency=async(c:string)=>{await DB.setPref('currency',c);setCurrencyState(c);if(c!=='original'&&!fx)void refreshFx();};
+ const setTimeFormat=async(format:TimeFormat)=>{await DB.setPref('timeFormat',format);setTimeFormatState(format);};
  const money=(x:{pay?:Pay,salary:string})=>x.pay?formatPay(x.pay,currency,fx?.rates??null).text:x.salary;
  const [toast,setToast]=useState<Toast|null>(null);
  const showToast=(message:string,action?:Toast['action'])=>{const id=Date.now();setToast({id,message,action});setTimeout(()=>setToast(t=>t?.id===id?null:t),2800);};
@@ -80,6 +80,8 @@ export function BriefProvider({children}:{children:React.ReactNode}) {
  useEffect(()=>{const sub=BackHandler.addEventListener('hardwareBackPress',()=>{
   if(quick||profileMenu){setQuick(false);setProfileMenu(false);return true;}
   if(page==='onboarding')return false;
+  // Settings owns an inner page stack and handles both nested and root back presses itself.
+  if(page==='settings')return false;
   if(returnTo||page!==tab){back();return true;}
   if(page!=='home'){setTab('home');go('home');return true;}
   return false;});return ()=>sub.remove();},[page,tab,quick,profileMenu,returnTo]);

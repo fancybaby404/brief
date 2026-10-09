@@ -18,7 +18,8 @@ import {ApplicationDetailScreen} from './src/screens/ApplicationDetailScreen';
 import {CalendarScreen} from './src/screens/CalendarScreen';
 import {MockScreen} from './src/screens/MockScreen';
 import {ChatScreen} from './src/screens/ChatScreen';
-import {ResumeScreen,SettingsScreen,NotificationsScreen} from './src/screens/AccountScreens';
+import {ResumeScreen,NotificationsScreen} from './src/screens/AccountScreens';
+import {SettingsScreen} from './src/screens/SettingsScreen';
 import {AddJobScreen} from './src/screens/AddJobScreen';
 import {OnboardingScreen} from './src/screens/OnboardingScreen';
 import {EmptyState} from './src/components/States';
@@ -32,8 +33,8 @@ function Shell(){const {page,ready,storageError,retryStorage,addJobIntent,closeA
  // unmounting it releases the microphone, Whisper and speech resources.
  const visited=useRef(new Set<Page>());if(KEEP_ALIVE.includes(page))visited.current.add(page);
  // Application detail is a focused workspace: it draws its own bar (back, title on scroll, more) and hides the tab bar.
- const hasTopHeader=!['onboarding','application-detail'].includes(page);
- const hasFloatingNav=!['onboarding','application-detail'].includes(page);
+ const hasTopHeader=!['onboarding','application-detail','settings'].includes(page);
+ const hasFloatingNav=!['onboarding','application-detail','settings'].includes(page);
  const plainHeader=['job-detail','resume','notifications','settings'].includes(page)||!!returnTo;
  const screens:Record<Page,React.ReactNode>={home:<HomeScreen/>,applications:<ApplicationsScreen/>,jobs:<JobsScreen/>, 'job-detail':<JobDetailScreen/>, 'application-detail':<ApplicationDetailScreen/>,calendar:<CalendarScreen/>,mock:<MockScreen/>,chat:<ChatScreen/>,resume:<ResumeScreen/>,notifications:<NotificationsScreen/>,settings:<SettingsScreen/>,onboarding:<OnboardingScreen/>};
  // The shell owns the bottom inset once; onboarding positions its own footer within it.

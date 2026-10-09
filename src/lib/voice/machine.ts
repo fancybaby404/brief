@@ -2,7 +2,7 @@
 // Every transition not listed is ignored (the same state object comes back), which is what
 // stops duplicate recordings, overlapping speech and repeated questions from late callbacks.
 
-export type Phase = 'preparing' | 'ready' | 'speaking' | 'listening' | 'transcribing' | 'reviewing' | 'thinking' | 'paused' | 'completed' | 'error';
+export type Phase = 'preparing' | 'ready' | 'synthesizing' | 'speaking' | 'listening' | 'transcribing' | 'reviewing' | 'thinking' | 'paused' | 'completed' | 'error';
 
 export type VoiceState = {
   phase: Phase;
@@ -23,6 +23,7 @@ export type VoiceEvent =
   | { type: 'PREPARED' }
   | { type: 'FAILED'; error: string }
   | { type: 'SPEAK'; turn: number }          // start reading the current question aloud (also Replay)
+  | { type: 'PLAYBACK_STARTED'; turn: number } // audio is audible; synthesis alone is not speaking
   | { type: 'SPOKEN'; turn: number }         // TTS finished (or was stopped) for that turn
   | { type: 'LISTEN' }                       // mic on
   | { type: 'STOP_LISTENING' }               // "Done speaking" or end of speech detected
@@ -51,11 +52,17 @@ export function voiceReducer(s: VoiceState, e: VoiceEvent): VoiceState {
       return s;
     case 'ready':
       if (e.type === 'LISTEN') return to('listening', { draft: '' });
-      if (e.type === 'SPEAK' && e.turn === s.turn) return to('speaking');
+      if (e.type === 'SPEAK' && e.turn === s.turn) return to('synthesizing');
       if (e.type === 'SEND' && e.text?.trim()) return to('thinking', { draft: e.text.trim() });
       if (e.type === 'PAUSE') return to('paused', { resumeTo: 'ready' });
       if (e.type === 'END') return to('thinking', { finishing: true });
       if (e.type === 'CONTINUE') return to('thinking');
+      return s;
+    case 'synthesizing':
+      if (e.type === 'PLAYBACK_STARTED' && e.turn === s.turn) return to('speaking');
+      if (e.type === 'SPOKEN' && e.turn === s.turn) return to('ready');
+      if (e.type === 'PAUSE' || e.type === 'BACKGROUND') return to('paused', { resumeTo: 'ready' });
+      if (e.type === 'END') return to('thinking', { finishing: true });
       return s;
     case 'speaking':
       if (e.type === 'SPOKEN' && e.turn === s.turn) return to('ready');
@@ -80,7 +87,7 @@ export function voiceReducer(s: VoiceState, e: VoiceEvent): VoiceState {
       if (e.type === 'END') return to('thinking', { finishing: true });
       return s;
     case 'thinking':
-      if (e.type === 'REPLY' && !s.finishing && e.turn > s.turn) return to(e.speak ? 'speaking' : 'ready', { turn: e.turn, draft: '' });
+      if (e.type === 'REPLY' && !s.finishing && e.turn > s.turn) return to(e.speak ? 'synthesizing' : 'ready', { turn: e.turn, draft: '' });
       if (e.type === 'DONE' && s.finishing) return to('completed', { draft: '' });
       if (e.type === 'END' && !s.finishing) return { ...s, finishing: true }; // wrap-up after the last answer
       return s;
@@ -100,6 +107,6 @@ export function voiceReducer(s: VoiceState, e: VoiceEvent): VoiceState {
 /** The mic may only open from these phases: never while Brief is talking or thinking. */
 export const canListen = (p: Phase) => p === 'ready' || p === 'reviewing';
 export const PHASE_LABEL: Record<Phase, string> = {
-  preparing: 'Getting ready…', ready: 'Your turn', speaking: 'Brief is asking…', listening: 'Listening…', transcribing: 'Transcribing on your phone…',
+  preparing: 'Getting ready…', ready: 'Your turn', synthesizing: 'Preparing voice…', speaking: 'Brief is asking…', listening: 'Listening…', transcribing: 'Transcribing on your phone…',
   reviewing: 'Check your answer', thinking: 'Brief is thinking…', paused: 'Paused', completed: 'Interview complete', error: 'Something went wrong',
 };

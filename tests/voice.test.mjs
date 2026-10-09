@@ -15,20 +15,43 @@ const run = (events, s = initialVoiceState()) => events.reduce(voiceReducer, s);
 
 // ---- state machine ----
 test('a full voice turn: ready → speaking → listening → transcribing → reviewing → thinking → speaking', () => {
-  let s = run([{ type: 'PREPARED' }, { type: 'SPEAK', turn: 0 }]);
+  let s = run([{ type: 'PREPARED' }, { type: 'SPEAK', turn: 0 }, { type: 'PLAYBACK_STARTED', turn: 0 }]);
   assert.equal(s.phase, 'speaking');
   s = run([{ type: 'SPOKEN', turn: 0 }, { type: 'LISTEN' }, { type: 'STOP_LISTENING' }, { type: 'HEARD', text: 'I led a team' }], s);
   assert.deepEqual([s.phase, s.draft], ['reviewing', 'I led a team']);
   s = run([{ type: 'EDIT', text: 'I led a team of four' }, { type: 'SEND' }], s);
   assert.deepEqual([s.phase, s.draft], ['thinking', 'I led a team of four']);
   s = voiceReducer(s, { type: 'REPLY', turn: 1, speak: true });
-  assert.deepEqual([s.phase, s.turn, s.draft], ['speaking', 1, '']);
+  assert.deepEqual([s.phase, s.turn, s.draft], ['synthesizing', 1, '']);
+  s = voiceReducer(s, { type: 'PLAYBACK_STARTED', turn: 1 });
+  assert.equal(s.phase, 'speaking');
+});
+
+test('spoken replies stay quiet while synthesizing and only show speaking on actual playback', () => {
+  const thinking = run([{ type: 'PREPARED' }, { type: 'SEND', text: 'My answer' }]);
+  const preparing = voiceReducer(thinking, { type: 'REPLY', turn: 1, speak: true });
+  assert.equal(preparing.phase, 'synthesizing');
+  assert.equal(voiceReducer(preparing, { type: 'LISTEN' }), preparing, 'the mic stays closed during synthesis');
+  const playing = voiceReducer(preparing, { type: 'PLAYBACK_STARTED', turn: 1 });
+  assert.equal(playing.phase, 'speaking');
+  assert.equal(voiceReducer(playing, { type: 'PLAYBACK_STARTED', turn: 1 }), playing, 'duplicate playback events do not restart a turn');
+  assert.equal(voiceReducer(playing, { type: 'SPOKEN', turn: 1 }).phase, 'ready');
+});
+
+test('pause and stop during synthesis invalidate late playback callbacks', () => {
+  const thinking = run([{ type: 'PREPARED' }, { type: 'SEND', text: 'My answer' }]);
+  const preparing = voiceReducer(thinking, { type: 'REPLY', turn: 1, speak: true });
+  const paused = voiceReducer(preparing, { type: 'PAUSE' });
+  assert.equal(paused.phase, 'paused');
+  assert.equal(voiceReducer(paused, { type: 'PLAYBACK_STARTED', turn: 1 }), paused);
+  const stopped = voiceReducer(preparing, { type: 'SPOKEN', turn: 1 });
+  assert.equal(stopped.phase, 'ready', 'a user stop returns to the answer-ready state');
 });
 
 test('no recording while Brief speaks or thinks; duplicate and stale callbacks are ignored', () => {
   const speaking = run([{ type: 'PREPARED' }, { type: 'SPEAK', turn: 0 }]);
   assert.equal(voiceReducer(speaking, { type: 'LISTEN' }), speaking, 'mic cannot open over the interviewer');
-  assert.ok(!canListen('speaking') && !canListen('thinking') && !canListen('transcribing'));
+  assert.ok(!canListen('synthesizing') && !canListen('speaking') && !canListen('thinking') && !canListen('transcribing'));
   const listening = run([{ type: 'SPOKEN', turn: 0 }, { type: 'LISTEN' }], speaking);
   assert.equal(voiceReducer(listening, { type: 'LISTEN' }), listening, 'no second recording');
   const thinking = run([{ type: 'STOP_LISTENING' }, { type: 'HEARD', text: 'x' }, { type: 'SEND' }], listening);
@@ -50,7 +73,8 @@ test('pause, background, resume, replay, end and feedback', () => {
   const bg = voiceReducer(speaking, { type: 'BACKGROUND' });
   assert.deepEqual([bg.phase, bg.resumeTo], ['paused', 'ready']);
   const ready = voiceReducer(bg, { type: 'RESUME' });
-  assert.equal(voiceReducer(ready, { type: 'SPEAK', turn: 0 }).phase, 'speaking', 'replay the current question');
+  assert.equal(voiceReducer(ready, { type: 'SPEAK', turn: 0 }).phase, 'synthesizing', 'replay starts in synthesis');
+  assert.equal(voiceReducer(voiceReducer(ready, { type: 'SPEAK', turn: 0 }), { type: 'PLAYBACK_STARTED', turn: 0 }).phase, 'speaking', 'playback starts only when audio is audible');
   assert.equal(voiceReducer(ready, { type: 'SPEAK', turn: 3 }), ready, 'cannot speak a question that is not current');
   const reviewing = run([{ type: 'LISTEN' }, { type: 'STOP_LISTENING' }, { type: 'HEARD', text: 'draft' }, { type: 'PAUSE' }, { type: 'RESUME' }], ready);
   assert.deepEqual([reviewing.phase, reviewing.draft], ['reviewing', 'draft'], 'pausing keeps the transcript to correct');
@@ -139,7 +163,7 @@ test('full interviews defer evaluation; practice evaluates; voice replies are pl
   const full = mockSystem(profile, job, false, 'technical', undefined, 2, true);
   assert.match(full, /Do NOT evaluate/);
   assert.match(full, /question 3 of about 5/);
-  assert.match(full, /read aloud/);
+  assert.match(full, /say aloud/);
   assert.match(mockSystem(profile, job, false, 'job', 'Tell me about yourself.'), /try again/);
   assert.match(mockSystem(profile, job, false, 'resume'), /resume deep-dive/);
   assert.match(mockSystem(profile, job, false, 'job'), /harder follow-up/);

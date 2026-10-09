@@ -1,14 +1,12 @@
-import React,{useEffect,useRef,useState} from 'react';
-import {ActivityIndicator,Alert,Image,Keyboard,Linking,Modal,StatusBar,StyleSheet,View} from 'react-native';
+import React,{useRef,useState} from 'react';
+import {ActivityIndicator,Alert,Keyboard,View} from 'react-native';
 import {KeyboardAvoidingView} from 'react-native-keyboard-controller';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {CameraView,useCameraPermissions,type FlashMode} from 'expo-camera';
-import * as Haptics from 'expo-haptics';
 import {useBrief,type AddJobIntent} from '../lib/appContext';
 import {C} from '../theme/tokens';
-import {Field,Icon,Input,Primary,Sheet,Tap,Txt,useReducedMotion} from '../components/Ui';
+import {Field,Icon,Input,Primary,Sheet,Tap,Txt} from '../components/Ui';
+import {CameraPanel} from '../components/CameraPanel';
 import {extractJob,MODEL_MISSING} from '../lib/ai';
-import {pickJobImage,readJobListing,recognizeJobImage} from '../lib/imports';
+import {readJobListing,recognizeJobImage} from '../lib/imports';
 import {uid} from '../lib/db';
 import type {Application} from '../types';
 
@@ -20,16 +18,22 @@ type SheetMode='manual'|'link'|'link-loading'|'review'|'processing'|null;
 export function AddJobScreen({intent,onClose}:{intent:AddJobIntent,onClose:()=>void}){
  const {putApp,go}=useBrief();
  const taskId=useRef(0);
+ const afterSheetClose=useRef<(()=>void)|null>(null);
  const [mode,setMode]=useState<SheetMode>(intent==='manual'?'manual':intent==='link'?'link':null);
+ const modeRef=useRef(mode);modeRef.current=mode;
  const [cameraOpen,setCameraOpen]=useState(intent==='camera'||intent==='library');
  const [fields,setFields]=useState<JobFields>(EMPTY),[more,setMore]=useState(false),[saving,setSaving]=useState(false);
  const [link,setLink]=useState(''),[linkError,setLinkError]=useState(''),[reviewNote,setReviewNote]=useState(''),[validation,setValidation]=useState('');
 
  function set<K extends keyof JobFields>(key:K,value:JobFields[K]){setFields(current=>({...current,[key]:value}));if(validation)setValidation('');}
+ function dismissSheet(after=onClose){
+  if(modeRef.current===null){after();return;}
+  afterSheetClose.current=after;setMode(null);
+ }
  function closeFlow(){
   const changed=Object.values(fields).some(Boolean)||!!link.trim();
-  const discard=()=>{taskId.current++;onClose();};
-  if(changed){Alert.alert('Discard this job?','Your unsaved details will be lost.',[{text:'Keep editing',style:'cancel'},{text:'Discard',style:'destructive',onPress:discard}]);return;}
+  const discard=()=>{taskId.current++;dismissSheet();};
+  if(changed){const previousMode=mode;setMode(null);Alert.alert('Discard this job?','Your unsaved details will be lost.',[{text:'Keep editing',style:'cancel',onPress:()=>setMode(previousMode)},{text:'Discard',style:'destructive',onPress:discard}]);return;}
   discard();
  }
  async function processImage(uri:string){
@@ -73,7 +77,7 @@ export function AddJobScreen({intent,onClose}:{intent:AddJobIntent,onClose:()=>v
   if(!fields.company.trim()||!fields.title.trim()){setValidation('Company and position are required.');return;}
   const application:Application={id:uid('application'),company:fields.company.trim(),title:fields.title.trim(),location:fields.location.trim(),salary:fields.salary.trim(),employmentType:fields.employmentType.trim(),description:fields.description.trim(),sourceUrl:fields.sourceUrl.trim(),status:'interested',createdAt:new Date().toISOString(),appliedAt:null,notes:''};
   setSaving(true);
-  try{await putApp(application);onClose();go('application-detail');}
+  try{await putApp(application);dismissSheet(()=>{onClose();go('application-detail');});}
   catch(error){setValidation((error as Error).message||'This job could not be saved. Please try again.');}
   finally{setSaving(false);}
  }
@@ -101,56 +105,12 @@ export function AddJobScreen({intent,onClose}:{intent:AddJobIntent,onClose:()=>v
  </View>;
 
  return <>
-  {cameraOpen&&<CameraCapture onClose={closeFlow} onUsePhoto={uri=>void processImage(uri)} startWithGallery={intent==='library'}/>}
-  <Sheet scroll visible={mode!==null} onClose={closeFlow} title={sheetTitle} footer={sheetFooter}>
+  {cameraOpen&&<CameraPanel onClose={closeFlow} onUsePhoto={uri=>void processImage(uri)} startWithGallery={intent==='library'}/>}
+  <Sheet scroll visible={mode!==null} onClose={closeFlow} onAfterClose={()=>{const after=afterSheetClose.current;afterSheetClose.current=null;after?.();}} title={sheetTitle} footer={sheetFooter}>
    {mode==='manual'?<KeyboardAvoidingView behavior="padding">{manualFields}</KeyboardAvoidingView>
     :mode==='review'?<KeyboardAvoidingView behavior="padding">{reviewFields}</KeyboardAvoidingView>
     :mode==='link'?<KeyboardAvoidingView behavior="padding"><Input value={link} onChangeText={value=>{setLink(value);setLinkError('');}} placeholder="https://…"/></KeyboardAvoidingView>
     :<View accessibilityRole="progressbar" style={{minHeight:75,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:12}}><ActivityIndicator color={C.blue}/><Txt size={14} color={C.muted}>{mode==='processing'?'Reading text and filling in details…':'Loading listing and checking its details…'}</Txt></View>}
   </Sheet>
  </>;
-}
-
-function CameraCapture({onClose,onUsePhoto,startWithGallery=false}:{onClose:()=>void,onUsePhoto:(uri:string)=>void,startWithGallery?:boolean}){
- const reduce=useReducedMotion();
- const [permission,requestPermission]=useCameraPermissions();
- const [photo,setPhoto]=useState(''),[flash,setFlash]=useState<FlashMode>('off'),[cameraReady,setCameraReady]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
- const camera=useRef<CameraView>(null),requested=useRef(false),galleryOpened=useRef(false);
- async function chooseGallery(){try{const uri=await pickJobImage();if(uri){setError('');setPhoto(uri);}else if(startWithGallery)onClose();}catch(e){setError((e as Error).message||'The photo library could not be opened.');}}
- useEffect(()=>{if(startWithGallery&&!galleryOpened.current){galleryOpened.current=true;void chooseGallery();}else if(!startWithGallery&&permission&&!permission.granted&&permission.canAskAgain&&!requested.current){requested.current=true;void requestPermission();}},[permission?.granted,startWithGallery]);
- async function capture(){if(!camera.current||!cameraReady||busy)return;setBusy(true);setError('');try{const result=await camera.current.takePictureAsync({quality:0.92});if(!result?.uri)throw new Error('No image was returned. Try again.');setPhoto(result.uri);void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);}catch(e){setError((e as Error).message||'The photo could not be captured.');}finally{setBusy(false);}}
- function retake(){setPhoto('');setError('');setCameraReady(false);}
- const button={width:46,height:46,borderRadius:23,backgroundColor:'rgba(8,17,32,0.48)',alignItems:'center',justifyContent:'center'} as const;
- return <Modal visible animationType={reduce?'fade':'slide'} presentationStyle="fullScreen" statusBarTranslucent onRequestClose={onClose}>
-  <View style={{flex:1,backgroundColor:'#07111F'}}>
-   {photo?<Image source={{uri:photo}} resizeMode="contain" style={StyleSheet.absoluteFill} onError={()=>{setError('This photo could not be opened. Choose another image.');setPhoto('');}}/>:permission?.granted?<CameraView ref={camera} style={StyleSheet.absoluteFill} facing="back" mode="picture" flash={flash} autofocus="on" onCameraReady={()=>setCameraReady(true)} onMountError={event=>setError(event.message||'Camera could not start.')}/>:null}
-   <StatusBar barStyle="light-content" backgroundColor="transparent" translucent/>
-   {photo?<>
-    <SafeAreaView edges={['top']} style={{position:'absolute',top:0,left:0,right:0,padding:18}}><Tap accessibilityRole="button" accessibilityLabel="Close photo preview" onPress={onClose} style={button}><Icon name="close" color={C.white}/></Tap></SafeAreaView>
-    <SafeAreaView edges={['bottom']} style={{position:'absolute',bottom:0,left:0,right:0,padding:22,flexDirection:'row',gap:12}}><View style={{flex:1}}><Primary large secondary label="Retake" onPress={retake}/></View><View style={{flex:1}}><Primary large label="Use Photo" onPress={()=>onUsePhoto(photo)}/></View></SafeAreaView>
-   </>:permission?.granted?<>
-    <SafeAreaView edges={['top']} style={{position:'absolute',top:0,left:0,right:0,paddingHorizontal:18,paddingTop:8,flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
-     <Tap accessibilityRole="button" accessibilityLabel="Close camera" onPress={onClose} style={button}><Icon name="close" color={C.white}/></Tap>
-     <Tap accessibilityRole="button" accessibilityLabel={flash==='off'?'Turn flash on':'Turn flash off'} accessibilityState={{selected:flash==='on'}} onPress={()=>setFlash(value=>value==='off'?'on':'off')} style={[button,{backgroundColor:flash==='on'?'rgba(22,119,242,0.88)':button.backgroundColor}]}><Icon name={flash==='on'?'flash':'flash-outline'} color={C.white}/></Tap>
-    </SafeAreaView>
-    <SafeAreaView edges={['bottom']} style={{position:'absolute',bottom:0,left:0,right:0,paddingHorizontal:24,paddingTop:32,paddingBottom:12,backgroundColor:'rgba(4,11,21,0.24)'}}>
-     {!!error&&<View accessibilityRole="alert"><Txt color={C.white} size={13} style={{textAlign:'center',marginBottom:12}}>{error}</Txt></View>}
-     <View style={{height:82,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
-      <Tap accessibilityRole="button" accessibilityLabel="Choose an existing photo" onPress={()=>void chooseGallery()} style={{width:54,height:54,borderRadius:14,borderWidth:1,borderColor:'rgba(255,255,255,0.6)',alignItems:'center',justifyContent:'center'}}><Icon name="images-outline" size={24} color={C.white}/></Tap>
-      <Tap accessibilityRole="button" accessibilityLabel="Take photo" disabled={!cameraReady||busy} onPress={()=>void capture()} style={{width:76,height:76,borderRadius:38,borderWidth:4,borderColor:C.white,alignItems:'center',justifyContent:'center',opacity:cameraReady?1:0.55}}><View style={{width:60,height:60,borderRadius:30,backgroundColor:C.white,alignItems:'center',justifyContent:'center'}}>{busy&&<ActivityIndicator color={C.blue}/>}</View></Tap>
-      <View style={{width:54,height:54}}/>
-     </View>
-    </SafeAreaView>
-   </>:permission===null?<SafeAreaView edges={['top','bottom']} style={{flex:1,alignItems:'center',justifyContent:'center',gap:12,padding:22}}><ActivityIndicator color={C.white}/><Txt color={C.white}>Checking camera access…</Txt></SafeAreaView>:<SafeAreaView edges={['top','bottom']} style={{flex:1,justifyContent:'space-between',padding:22}}>
-    <Tap accessibilityRole="button" accessibilityLabel="Close camera" onPress={onClose} style={[button,{alignSelf:'flex-start'}]}><Icon name="close" color={C.white}/></Tap>
-    <View style={{alignItems:'center',gap:12,paddingHorizontal:10}}>
-     <Icon name="camera-outline" size={38} color={C.white}/><Txt size={21} bold color={C.white}>Camera access needed</Txt>
-     <Txt size={14} color="#D8E2F0" style={{textAlign:'center'}}>Allow Brief to photograph a job listing. You can also choose an existing photo.</Txt>
-     {!!error&&<View accessibilityRole="alert"><Txt size={13} color="#FFD6DC" style={{textAlign:'center'}}>{error}</Txt></View>}
-     <View style={{width:'100%',gap:9}}><Primary label={permission?.canAskAgain?'Allow camera':'Open Settings'} onPress={()=>{if(permission?.canAskAgain){requested.current=true;void requestPermission().then(result=>{if(!result.granted)setError('Camera access is off. Allow it in Settings or choose a photo.');});}else void Linking.openSettings();}}/><Primary secondary label="Choose a photo" onPress={()=>void chooseGallery()}/></View>
-    </View>
-    <View style={{height:44}}/>
-   </SafeAreaView>}
-  </View>
- </Modal>;
 }

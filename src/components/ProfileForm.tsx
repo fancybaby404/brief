@@ -1,7 +1,7 @@
 import React,{useEffect,useState} from 'react';
 import {KeyboardAvoidingView,Modal,ScrollView,View} from 'react-native';
 import {C} from '../theme/tokens';
-import {Field,Tap,Txt} from './Ui';
+import {Field,Tap,Txt,useReducedMotion} from './Ui';
 import type {Profile} from '../types';
 
 type Details=Pick<Profile,'name'|'goals'|'experience'|'education'|'skills'>;
@@ -9,10 +9,11 @@ type Details=Pick<Profile,'name'|'goals'|'experience'|'education'|'skills'>;
 /** Manual resume details in a native form sheet (pageSheet on iOS, full screen on Android).
  *  Cancel discards; Save writes the fields back through onSave. */
 export function ProfileForm({visible,profile,onClose,onSave}:{visible:boolean,profile:Profile,onClose:()=>void,onSave:(d:Details)=>void}){
+ const reduce=useReducedMotion();
  const [d,setD]=useState<Details>(profile);
  useEffect(()=>{if(visible)setD({name:profile.name,goals:profile.goals,experience:profile.experience,education:profile.education,skills:profile.skills});},[visible]);
  const set=(k:keyof Details)=>(v:string)=>setD(old=>({...old,[k]:v}));
- return <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+ return <Modal visible={visible} animationType={reduce?'fade':'slide'} presentationStyle="pageSheet" allowSwipeDismissal={!reduce} onRequestClose={onClose}>
  <View style={{flex:1,backgroundColor:C.background}}>
   <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:8,height:56,borderBottomWidth:1,borderBottomColor:C.line}}>
    <Tap accessibilityRole="button" onPress={onClose} style={{minWidth:64,minHeight:44,justifyContent:'center',paddingHorizontal:10}}><Txt size={16} color={C.blue}>Cancel</Txt></Tap>

@@ -7,6 +7,7 @@ import {
   askBriefSystem, mockSystem, EXTRACT_SYSTEM, extractUser, parseJobExtraction, ROUTER_SYSTEM, routerUser,
   VISION_JOB_SYSTEM, VISION_JOB_JSON_SCHEMA, VISION_EVENT_SYSTEM, VISION_EVENT_JSON_SCHEMA, visionUser, parseVisionJobs, parseVisionEvent, partialAnswer, type AnswerContext,
   MOCK_BEGIN, MOCK_FINISH, FEEDBACK_RULES, FEEDBACK_JSON_SCHEMA, parseFeedback, feedbackText, VISION_RESUME_SYSTEM, VISION_RESUME_JSON_SCHEMA, parseVisionResume,
+  RESUME_TEXT_SYSTEM, RESUME_TEXT_JSON_SCHEMA, resumeTextUser, parseResumeText,
 } from './prompts';
 import { ROUTER_SCHEMA, intentFromRouter } from './agent/intent';
 import { record, timer } from './perf';
@@ -258,4 +259,9 @@ export async function visionExtractResume(imageUri: string, ocr: string) {
 }
 export async function extractJob(ocr: string) {
   return parseJobExtraction(await generate(EXTRACT_SYSTEM, extractUser(ocr), [], 420), ocr);
+}
+/** Extracts profile fields from resume text with the installed local model. */
+export async function extractResume(text:string){
+ const r=await completeJson({system:RESUME_TEXT_SYSTEM,user:resumeTextUser(text),maxTokens:700,temperature:0.1,schema:RESUME_TEXT_JSON_SCHEMA});
+ return parseResumeText(String(r.text||''));
 }

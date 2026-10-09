@@ -26,10 +26,10 @@ const PRESS_TRANSITION={transitionProperty:'transform',transitionDuration:120,tr
 /** Every pressable: 3% scale on touch-down in 120 ms (feedback on press-in, commit on release).
  *  A CSS transition, not a worklet: it's a two-state change, and setState fires twice per press, never per frame. */
 export function Tap({style,onPressIn,onPressOut,...p}:Omit<PressableProps,'style'>&{style?:StyleProp<ViewStyle>}) {
- const [pressed,setPressed]=useState(false);
+ const [pressed,setPressed]=useState(false),reduce=useReanimatedReducedMotion();
  return <APressable {...p} pressRetentionOffset={16}
   onPressIn={e=>{setPressed(true);onPressIn?.(e);}} onPressOut={e=>{setPressed(false);onPressOut?.(e);}}
-  style={[style,PRESS_TRANSITION,{transform:[{scale:pressed?0.97:1}]}]}/>;
+  style={[style,!reduce&&PRESS_TRANSITION,{transform:[{scale:pressed&&!reduce?0.97:1}]}]}/>;
 }
 export function Primary({label,onPress,secondary=false,disabled=false,large=false,icon}:{label:string,onPress:()=>void,secondary?:boolean,disabled?:boolean,large?:boolean,icon?:string}) {const color=secondary?C.blue:C.white;return <Tap accessibilityRole="button" accessibilityLabel={label} onPress={onPress} disabled={disabled} style={{minHeight:large?54:46,justifyContent:'center',paddingHorizontal:16,backgroundColor:secondary?C.pale:C.blue,borderRadius:large?16:13,opacity:disabled?.55:1,alignItems:'center'}}><Txt color={color} bold size={large?17:14}>{label}</Txt>{!!icon&&<View style={{position:'absolute',right:18}}><Icon name={icon} size={large?20:17} color={color}/></View>}</Tap>}
 export function Input({value,onChangeText,placeholder,multiline=false}:{value:string,onChangeText:(text:string)=>void,placeholder?:string,multiline?:boolean}) {return <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={C.soft} multiline={multiline} style={{backgroundColor:C.pale2,color:C.ink,borderRadius:12,padding:12,marginTop:5,minHeight:multiline?100:45,textAlignVertical:multiline?'top':'center',fontSize:14}}/>}
@@ -108,10 +108,11 @@ export function CloudHalo({size,children}:{size:number,children:React.ReactNode}
 
 /** Bottom sheet: dims the screen, springs up from the bottom, drag down or tap outside to dismiss.
  *  Reduce Motion swaps the slide for a short cross-fade. */
-export function Sheet({visible,onClose,title,children,footer,scroll=false}:{visible:boolean,onClose:()=>void,title:string,children:React.ReactNode,footer?:React.ReactNode,scroll?:boolean}) {
+export function Sheet({visible,onClose,onAfterClose,title,children,footer,scroll=false}:{visible:boolean,onClose:()=>void,onAfterClose?:()=>void,title:string,children:React.ReactNode,footer?:React.ReactNode,scroll?:boolean}) {
  const H=Dimensions.get('window').height;const reduce=useReducedMotion();
  const [mounted,setMounted]=useState(visible);
- const close=useRef(onClose);close.current=onClose;const callClose=useCallback(()=>close.current(),[]);
+ const close=useRef(onClose);close.current=onClose;const afterClose=useRef(onAfterClose);afterClose.current=onAfterClose;
+ const callClose=useCallback(()=>close.current(),[]),finishClose=useCallback(()=>{setMounted(false);afterClose.current?.();},[]);
  // y: sheet offset from its resting position (UI thread). height: measured panel height for the dismiss threshold.
  const y=useSharedValue(H),fade=useSharedValue(0),start=useSharedValue(0),height=useSharedValue(H*0.5);
  useEffect(()=>{
@@ -119,18 +120,19 @@ export function Sheet({visible,onClose,title,children,footer,scroll=false}:{visi
    if(reduce){y.set(0);fade.set(withTiming(1,{duration:180,easing:EASE_OUT}));}
    else{fade.set(1);y.set(withSpring(0,{duration:300,dampingRatio:1}));} // opened by a tap: no momentum, so no overshoot
   }else if(mounted){
-   const done=(finished?:boolean)=>{'worklet';if(finished)scheduleOnRN(setMounted,false);};
+   const done=(finished?:boolean)=>{'worklet';if(finished)scheduleOnRN(finishClose);};
    if(reduce)fade.set(withTiming(0,{duration:150,easing:EASE_OUT},done));
+   else if(y.get()>=H)finishClose();
    else y.set(withTiming(H,{duration:240,easing:EASE_SHEET},done));
-  }},[visible]);
- const pan=useMemo(()=>Gesture.Pan().activeOffsetY([-10,10])
+  }},[visible,finishClose]);
+ const pan=useMemo(()=>Gesture.Pan().enabled(!reduce).activeOffsetY([-10,10])
   .onStart(()=>{start.set(y.get());}) // grab mid-animation continues from where the sheet is
   .onUpdate(e=>{const next=start.get()+e.translationY;y.set(next>=0?next:rubberband(next,height.get()));})
   .onEnd(e=>{
    if(y.get()+project(e.velocityY)>height.get()*0.4){ // where the flick was going, not just how far it moved
     y.set(withSpring(H,{duration:300,dampingRatio:1,velocity:e.velocityY,overshootClamping:true},f=>{if(f)scheduleOnRN(callClose);}));
    }else y.set(withSpring(0,{...SPRING_SHEET,velocity:e.velocityY}));
-  }),[]);
+  }),[reduce]);
  const backdrop=useAnimatedStyle(()=>({opacity:fade.get()*interpolate(y.get(),[0,height.get()],[1,0],Extrapolation.CLAMP)}));
  const panel=useAnimatedStyle(()=>({opacity:fade.get(),transform:[{translateY:y.get()}]}));
  if(!mounted)return null;
@@ -163,7 +165,7 @@ const FADE_IN=FadeIn.duration(150).easing(EASE_OUT),FADE_OUT=FadeOut.duration(12
 export const SCRIM_IN=FadeIn.duration(200).easing(EASE_OUT),SCRIM_OUT=FadeOut.duration(160).easing(EASE_OUT);
 
 /** Anchored menu. Mount/unmount it conditionally: the entering/exiting animations run on the UI thread. */
-export function Popover({origin,style,children}:{origin:'top right'|'bottom right',style:StyleProp<ViewStyle>,children:React.ReactNode}) {
+export function Popover({origin,style,children}:{origin:'top right'|'bottom right'|'bottom left',style:StyleProp<ViewStyle>,children:React.ReactNode}) {
  const reduce=useReducedMotion();
  return <Reanimated.View layout={reduce?undefined:LIST_REFLOW} entering={reduce?FADE_IN:popIn} exiting={reduce?FADE_OUT:popOut} accessibilityViewIsModal style={[{position:'absolute',backgroundColor:C.white,borderRadius:18,borderWidth:1,borderColor:C.line,shadowColor:'#33446A',shadowOpacity:0.16,shadowRadius:18,elevation:13,transformOrigin:origin},style]}>{children}</Reanimated.View>;
 }

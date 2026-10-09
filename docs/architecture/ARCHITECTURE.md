@@ -1,7 +1,7 @@
 # Technical architecture
 
 ## Platform
-React Native 0.86 via Expo SDK 57; TypeScript strict mode; real-device **development build**. Android and iOS targeted. This starter deliberately uses lightweight state-driven navigation instead of a heavyweight routing dependency; migrate to Expo Router only when deep links and share extensions justify it.
+React Native 0.86 via Expo SDK 57; TypeScript strict mode; real-device **development build**. Android and iOS targeted. The app keeps its lightweight state-driven navigation for tabs and top-level pages; Settings uses a small React Navigation native stack for its child pages so platform back gestures and transitions work without migrating the rest of the app.
 
 ## Separation
 - `src/screens`: page components, display and event handlers.
@@ -18,6 +18,8 @@ React Native 0.86 via Expo SDK 57; TypeScript strict mode; real-device **develop
 ## Data boundary & schema
 **SQLite persisted:** applications (id, company, title, status, description, etc), calendar events, message threads (including private image URI and generated suggestions) and profile info (experience, skills, resume URI, extracted text), imported GGUF and optional projector URIs.
 
+User preferences use the same SQLite preferences table: salary currency, 12/24-hour time format, local AI model/projector paths, selected Whisper model and files, preferred interviewer voice, and speaking speed. Settings child pages use a nested native stack so scroll state is retained; its own header/back and swipe-back gesture replace the floating tab bar and add button while Settings is open. Native-feeling selection/profile sheets reuse the shared `FormSheet` component.
+
 Application: id, company, title, status (interested · applied · under_review · interview · offer · rejected · withdrawn), location, salary, employmentType, description, sourceUrl, createdAt, appliedAt?, notes, activity? ([{at, from, to}] status moves, appended by `trackStatus` in `putApp`).
 Event: id, applicationId?, title, date (local `YYYY-MM-DDTHH:mm:00`), notes, kind? (interview · deadline · assessment · follow_up · other; missing = other), location?, createdAt?, reminderMinutes?, notificationId? (local notification to cancel on edit/delete).
 Profile: name, skills, education, experience, goals, resumeUri, resumeText.
@@ -29,10 +31,10 @@ Message: id, thread, user/assistant role, content, timestamp.
 Download a curated GGUF from its pinned Hugging Face source or import a .gguf locally, store it in app-private documents, then call `llama.rn.initLlama` on device and `completion({ messages, n_predict, temperature })`. `n_ctx=2048`, CPU initial default for maximal device portability, GPU and prompt sizes after physical profiling. `ensureModel` errors must be visible, with Settings CTA. There is no cloud fallback. See `../ai/LOCAL_AI.md`.
 
 ## OCR
-Full-screen Expo Camera/gallery -> capture preview -> Expo OCR Kit platform-native Vision/ML Kit -> raw string -> optional local LLM structured extraction -> editable human review -> SQLite. Pasted http(s) job links are fetched only after the user submits them; readable HTML/metadata is passed to the same local extraction contract. OCR and page retrieval stay useful when Local AI fails; the original text remains editable and the required company/title can be entered manually. Job page contents are untrusted data and never trigger links or commands.
+PiP-style Expo Camera/gallery panel -> capture preview -> Expo OCR Kit platform-native Vision/ML Kit -> raw string -> optional local LLM structured extraction -> editable human review -> SQLite. Pasted http(s) job links are fetched only after the user submits them; readable HTML/metadata is passed to the same local extraction contract. OCR and page retrieval stay useful when Local AI fails; the original text remains editable and the required company/title can be entered manually. Job page contents are untrusted data and never trigger links or commands.
 
 ## Resume
-DocumentPicker -> file copied into private app documents -> locally extract native text for digital PDF via Expo PDF Text Extract when supported -> editable `experience/education/skills/goals` plus extracted text in local prompts. DOCX and scanned PDFs need parser/OCR extension; no claims otherwise. Large Resume preview in starter is a formatted visual summary, **not actual PDF page rendering**. Planned native PDF renderer: react-native-pdf + compatible config plugin, with device QA.
+DocumentPicker -> copy into uniquely named private app document (never move the picker cache file) -> extract digital PDF text with Expo PDF Text Extract, or on-device OCR for JPG/PNG/WEBP resume images -> optional local GGUF extraction into editable `name/experience/education/skills/goals`, with the original extracted text retained for local prompts. DOCX text parsing and scanned-PDF page OCR are unsupported and use manual entry. Keep the old resume until the new file and profile update succeed. The large Resume preview in the starter is a formatted visual summary, **not actual PDF page rendering**. Planned native PDF renderer: react-native-pdf + compatible config plugin, with device QA.
 
 ## Real job discovery
 Jobicy endpoint `https://jobicy.com/api/v2/remote-jobs?count=40&tag=...`. No API key but last-7-day remote-job scope and rate limits. Keep canonical source URL. Filter by eligible location using provider data when needed; don't fabricate geography, employer logo, salary, or "verified" status. Later add licensed Philippines provider as separate adapter.

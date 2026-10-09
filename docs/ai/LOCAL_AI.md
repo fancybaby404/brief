@@ -19,8 +19,9 @@
 
 ## Three context flows
 1. **Job extraction**: on-device OCR text or user-submitted readable listing-page text => JSON fields `company,title,location,salary,employmentType,description`. Missing => `""`, not guessed. Human edit/confirm; no automatic "applied" inference. Page retrieval is a direct request to the user-pasted URL; all extraction remains on-device.
-2. **Ask Brief**: local career coach, grounded in selected job (if any), up to 7 saved job snippets, optional candidate profile and extracted text, recent messages. Respond briefly, identify risk indicators with quotes from source where possible. Generate follow-up question suggestions on-device from the current conversation; never show static suggestions when the model is missing.
-3. **Mock**: take job description and candidate profile as context, role-play reasonable interviewer (not affiliated with real company). Ask exactly one question per turn, adapt follow-up, finish with action-oriented feedback tied to user's statements.
+2. **Resume extraction**: embedded text from a digital PDF or on-device OCR from a resume image -> local GGUF extracts name, skills, experience, education and stated goals into editable profile fields. Resume text is fenced as untrusted input; no field is invented. Model missing/failure keeps the file and text and offers manual entry.
+3. **Ask Brief**: local career coach, grounded in selected job (if any), up to 7 saved job snippets, optional candidate profile and extracted text, recent messages. Respond briefly, identify risk indicators with quotes from source where possible. Generate follow-up question suggestions on-device from the current conversation; never show static suggestions when the model is missing.
+4. **Mock**: take job description and candidate profile as context, role-play reasonable interviewer (not affiliated with real company). Ask exactly one question per turn, adapt follow-up, finish with action-oriented feedback tied to user's statements.
 
 ## Agent (Ask Brief actions)
 - Rules first, model second: deterministic intent rules handle common phrasings; only unrecognised action-like messages go to a schema-constrained router call. Invalid router output = plain chat.

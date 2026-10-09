@@ -1,12 +1,14 @@
-import React,{useEffect,useRef,useState} from 'react';import {Alert,Image,ScrollView,TextInput,View} from 'react-native';
+import React,{useEffect,useRef,useState} from 'react';import {Alert,Dimensions,Image,Modal,Pressable,ScrollView,TextInput,View} from 'react-native';
 import {KeyboardAvoidingView} from 'react-native-keyboard-controller';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Reanimated,{FadeIn} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import {useBrief} from '../lib/appContext';import * as DB from '../lib/db';import {uid,listMessages,saveMessage} from '../lib/db';
 import {timer} from '../lib/perf';
 import {throttle} from '../lib/throttle';
 import {modelLoaded,askBrief,suggestBriefQuestions,visionInstalled,routeIntent,visionExtractJobs,visionExtractEvent,visionExtractResume,stopGeneration,isCancelled,MODEL_MISSING} from '../lib/ai';
-import {pickJobImage,importChatImage,recognizeJobImage} from '../lib/imports';import {C} from '../theme/tokens';import {Heading,Icon,Txt,useKeyboardVisible,Tap} from '../components/Ui';import type {Event,Message} from '../types';
+import {pickJobImage,pickImageFile,importChatImage,recognizeJobImage} from '../lib/imports';import {C} from '../theme/tokens';import {Heading,Icon,Popover,Txt,useKeyboardVisible,Tap} from '../components/Ui';import type {Event,Message} from '../types';
+import {CameraPanel} from '../components/CameraPanel';
 import {LiveMascot} from '../components/LiveMascot';
 import {InlineError,MessageBubble,ModelSetupCard,ThinkingBubble,TypingDots,useModelInstalled} from '../components/States';
 import {AgentCardView,WorkingRow} from '../components/AgentCards';
@@ -113,8 +115,13 @@ export function ChatScreen(){const brief=useBrief();const {profile,applications,
    if(isCancelled(e)){if(e.partial.trim())await addAssistant({content:`${e.partial.trim()}\n\n— Stopped`,source:'model',focusId:focus});}
    else setError((e as Error).message);
   }finally{done();setBusy(false);setStream('');setWorking('');}}
- async function attachImage(camera=false){if(!aiReady||!visionReady||busy)return;try{const picked=await pickJobImage(camera);if(picked)setImageUri(await importChatImage(picked));}catch(e){Alert.alert('Couldn’t add image',(e as Error).message);}}
- const chooseImage=()=>Alert.alert('Add an image','A job post, an interview invite, a recruiter message or your resume. It stays on this phone.',[{text:'Take photo',onPress:()=>void attachImage(true)},{text:'Choose from library',onPress:()=>void attachImage(false)},{text:'Cancel',style:'cancel'}]);
+ async function attachUri(uri:string){try{setImageUri(await importChatImage(uri));}catch(e){Alert.alert('Couldn’t add image',(e as Error).message);}}
+ async function attachImage(){if(!aiReady||!visionReady||busy)return;try{const picked=await pickJobImage();if(picked)await attachUri(picked);}catch(e){Alert.alert('Couldn’t add image',(e as Error).message);}}
+ async function attachFile(){if(!aiReady||!visionReady||busy)return;try{const picked=await pickImageFile();if(picked)await attachUri(picked);}catch(e){Alert.alert('Couldn’t add image',(e as Error).message);}}
+ const attachBtn=useRef<View>(null);
+ const [attachPos,setAttachPos]=useState<{left:number,bottom:number}|null>(null),[attachOpen,setAttachOpen]=useState(false),[cameraOpen,setCameraOpen]=useState(false);
+ const showAttach=()=>attachBtn.current?.measureInWindow((x,y)=>{setAttachPos({left:Math.max(8,x-6),bottom:Dimensions.get('window').height-y+8});setAttachOpen(true);});
+ const hideAttach=(then?:()=>void)=>{setAttachOpen(false);setTimeout(()=>{setAttachPos(null);then?.();},160);};
  async function send(text=entry){const q=text.trim(),attachment=imageUri;if((!q&&!attachment)||busy||installed===null||(attachment&&!visionReady))return;suggestionCycle.current++;setSuggestionsBusy(false);const prompt=q||'Describe this image and suggest how it could help with my job search.';setEntry('');setImageUri('');setSuggestions([]);const m:Message={id:uid('msg'),thread,role:'user',content:prompt,imageUri:attachment||undefined,createdAt:new Date().toISOString(),focusId:focus};const previous=messages;setMessages(old=>[...old,m]);await saveMessage(m);await respond(prompt,previous,m,attachment||undefined);}
  function retry(){const i=messages.map(m=>m.role).lastIndexOf('user');if(i>=0&&!busy){suggestionCycle.current++;setSuggestionsBusy(false);setSuggestions([]);void respond(messages[i].content,messages.slice(0,i),messages[i],messages[i].imageUri);}}
  const reviewEvent=(msgId:string)=>(card:Extract<AgentCard,{type:'event'}>)=>{const p=card.proposal,existing=p.eventId?events.find(e=>e.id===p.eventId):undefined;
@@ -147,7 +154,7 @@ export function ChatScreen(){const brief=useBrief();const {profile,applications,
  {aiReady&&suggestionsBusy&&suggestions.length===0&&<View accessible accessibilityLabel="Brief is preparing question ideas" style={{height:32,alignItems:'flex-start',justifyContent:'center',paddingLeft:8}}><TypingDots/></View>}
  {!!imageUri&&<View style={{flexDirection:'row',alignItems:'center',gap:9,alignSelf:'flex-start',padding:6,backgroundColor:C.white,borderRadius:14,borderWidth:1,borderColor:C.line}}><Image source={{uri:imageUri}} style={{width:52,height:52,borderRadius:9}}/><Txt size={12} color={C.muted} style={{maxWidth:160}} numberOfLines={1}>Image attached</Txt><Tap accessibilityRole="button" accessibilityLabel="Remove attached image" onPress={()=>setImageUri('')} style={{width:36,height:36,alignItems:'center',justifyContent:'center'}}><Icon name="close" color={C.muted}/></Tap></View>}
  <View style={{backgroundColor:C.white,borderRadius:28,borderWidth:1,borderColor:C.line,padding:6,flexDirection:'row',alignItems:'center',gap:5}}>
- <Tap accessibilityRole="button" accessibilityLabel="Add image" accessibilityHint={visionReady?'Choose a job screenshot or photo to discuss with Brief':'Images need the Qwen3-VL model and its vision encoder'} disabled={!aiReady||!visionReady||busy} onPress={chooseImage} style={{width:44,height:44,borderRadius:22,alignItems:'center',justifyContent:'center',backgroundColor:C.pale2,opacity:aiReady&&visionReady&&!busy?1:0.42}}><Icon name="add" size={24} color={C.blue}/></Tap>
+ <View ref={attachBtn} collapsable={false}><Tap accessibilityRole="button" accessibilityLabel="Attach" accessibilityHint={visionReady?'Take a photo or attach an image to discuss with Brief':'Images need the Qwen3-VL model and its vision encoder'} disabled={!aiReady||!visionReady||busy} onPress={showAttach} style={{width:44,height:44,borderRadius:22,alignItems:'center',justifyContent:'center',backgroundColor:C.pale2,opacity:aiReady&&visionReady&&!busy?1:0.42}}><Icon name="add" size={24} color={C.blue}/></Tap></View>
  <TextInput accessibilityLabel="Message Brief" editable={canType} value={entry} onChangeText={setEntry} placeholder={installed===null?'Checking on-device AI…':noModel?'Manage jobs here, or set up AI to chat':'Message Brief...'} placeholderTextColor={C.soft} style={{padding:8,flex:1,color:C.ink,maxHeight:120}} multiline/>
  {busy
   ?<Tap accessibilityRole="button" accessibilityLabel="Stop generating" onPress={()=>void stopGeneration()} style={{width:44,height:44,backgroundColor:C.ink,borderRadius:22,alignItems:'center',justifyContent:'center'}}><Icon name="stop" size={16} color={C.white}/></Tap>
@@ -155,5 +162,13 @@ export function ChatScreen(){const brief=useBrief();const {profile,applications,
  </View>
  <EventSheet visible={sheet.open} event={sheet.event} draft={sheet.draft} onClose={()=>setSheet(s=>({...s,open:false}))}
   onSaved={e=>{const id=sheet.msgId;if(!id)return;const m=latest.current.find(x=>x.id===id);if(m?.card?.type==='event')updateCard(id)({...m.card,state:'done',savedId:e.id});}}/>
+ <Modal transparent visible={!!attachPos} animationType="none" statusBarTranslucent onRequestClose={()=>hideAttach()}>
+  <Pressable accessibilityRole="button" accessibilityLabel="Close menu" style={{flex:1}} onPress={()=>hideAttach()}/>
+  {attachPos&&attachOpen&&<Popover origin="bottom left" style={{left:attachPos.left,bottom:attachPos.bottom,minWidth:210,paddingVertical:4}}>
+   {([{label:'Camera',icon:'camera-outline',action:()=>setCameraOpen(true)},{label:'Photo',icon:'images-outline',action:()=>void attachImage()},{label:'File',icon:'document-outline',action:()=>void attachFile()}] as const).map((o,i)=>
+    <Tap key={o.label} accessibilityRole="menuitem" onPress={()=>{void Haptics.selectionAsync();hideAttach(o.action);}} style={{flexDirection:'row',alignItems:'center',minHeight:48,paddingHorizontal:14,gap:12,borderTopWidth:i?1:0,borderTopColor:C.line}}><Icon name={o.icon} size={21}/><Txt bold size={14} style={{flex:1}}>{o.label}</Txt></Tap>)}
+  </Popover>}
+ </Modal>
+ {cameraOpen&&<CameraPanel onClose={()=>setCameraOpen(false)} onUsePhoto={uri=>{setCameraOpen(false);void attachUri(uri);}}/>}
  </KeyboardAvoidingView>;
 }

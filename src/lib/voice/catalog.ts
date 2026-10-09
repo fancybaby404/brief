@@ -19,22 +19,31 @@ export const formatMB = (b: number) => `${Math.round(b / 1e6)} MB`;
 export type VoiceInfo = { identifier: string; name: string; quality: string; language: string };
 export type VoiceChoice = { voice?: VoiceInfo; offline: 'verified' | 'unverified' | 'none'; reason: string };
 
+/** Voices users may choose when they explicitly need verified on-device speech output. */
+export function offlineEnglishVoices(voices: VoiceInfo[], platform: 'ios' | 'android' | string): VoiceInfo[] {
+  const en = voices.filter(v => /^en([-_]|$)/i.test(v.language));
+  if (platform === 'ios') return [...en].sort((a, b) => rankVoice(b) - rankVoice(a));
+  if (platform === 'android') return en.filter(v => /-local$/i.test(v.identifier)).sort((a, b) => rankVoice(b) - rankVoice(a));
+  return [];
+}
+
+const rankVoice = (v: VoiceInfo) => (v.quality === 'Enhanced' ? 4 : 0) + (/^en[-_](us|gb|au)$/i.test(v.language) ? 2 : /^en[-_]ph$/i.test(v.language) ? 3 : 0) + (/novelty|whisper|bells|bad news|boing|bubbles|jester|organ|trinoids|zarvox|cellos|superstar|wobble|albert|fred|junior|ralph|kathy/i.test(v.name) ? -10 : 0);
+
 /** Picks an English interviewer voice that runs on the device.
  *  iOS: AVSpeechSynthesizer voices are synthesised on-device, so any installed English voice is offline.
  *  Android: the API doesn't say; Google's engine names on-device voices "…-local" and cloud ones "…-network",
  *  so only "-local" voices count as verified. Anything else is reported as unverified, never assumed. */
 export function chooseVoice(voices: VoiceInfo[], platform: 'ios' | 'android' | string, preferred?: string): VoiceChoice {
   const en = voices.filter(v => /^en([-_]|$)/i.test(v.language));
-  const rank = (v: VoiceInfo) => (v.quality === 'Enhanced' ? 4 : 0) + (/^en[-_](us|gb|au)$/i.test(v.language) ? 2 : /^en[-_]ph$/i.test(v.language) ? 3 : 0) + (/novelty|whisper|bells|bad news|boing|bubbles|jester|organ|trinoids|zarvox|cellos|superstar|wobble|albert|fred|junior|ralph|kathy/i.test(v.name) ? -10 : 0);
   if (platform === 'ios') {
-    const pool = [...en].sort((a, b) => rank(b) - rank(a));
+    const pool = [...en].sort((a, b) => rankVoice(b) - rankVoice(a));
     const voice = pool.find(v => v.identifier === preferred) ?? pool[0];
     return voice ? { voice, offline: 'verified', reason: 'iOS voices are synthesised on this phone.' } : { offline: 'none', reason: 'No English voice is installed. Add one in Settings → Accessibility → Spoken Content → Voices.' };
   }
-  const local = en.filter(v => /-local$/i.test(v.identifier)).sort((a, b) => rank(b) - rank(a));
+  const local = en.filter(v => /-local$/i.test(v.identifier)).sort((a, b) => rankVoice(b) - rankVoice(a));
   const voice = local.find(v => v.identifier === preferred) ?? local[0];
   if (voice) return { voice, offline: 'verified', reason: 'On-device voice (Google “local” voice).' };
-  const other = en.filter(v => !/-network$/i.test(v.identifier)).sort((a, b) => rank(b) - rank(a))[0];
+  const other = en.filter(v => !/-network$/i.test(v.identifier)).sort((a, b) => rankVoice(b) - rankVoice(a))[0];
   if (other) return { voice: other, offline: 'unverified', reason: 'This voice’s engine doesn’t say whether it works offline. Test it with airplane mode on.' };
   return { offline: 'none', reason: 'No offline English voice found. Install one in Android Settings → Text-to-speech → Install voice data.' };
 }

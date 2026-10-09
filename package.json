@@ -10,16 +10,24 @@
     "typecheck": "tsc --noEmit",
     "doctor": "expo-doctor",
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./tests/ts-resolve.mjs --test tests/*.test.mjs",
-    "prebuild": "expo prebuild"
+    "prebuild": "expo prebuild",
+    "video": "npm --prefix video run dev",
+    "video:build": "npm --prefix video run build",
+    "emulator": "bash scripts/start-emulator.sh",
+    "record": "bash scripts/record-demo.sh"
   },
   "dependencies": {
     "@expo-google-fonts/fredoka": "^0.4.1",
     "@expo/vector-icons": "^15.0.2",
     "@fugood/react-native-audio-pcm-stream": "1.1.4",
+    "@kittentts/react-native": "1.2.0",
     "@react-native-community/datetimepicker": "9.1.0",
+    "@react-navigation/native": "^7.5.0",
+    "@react-navigation/native-stack": "^7.20.0",
     "buffer": "^6.0.3",
     "expo": "~57.0.17",
     "expo-asset": "~57.0.19",
+    "expo-audio": "~57.0.5",
     "expo-build-properties": "~57.0.22",
     "expo-camera": "~57.0.6",
     "expo-dev-client": "~57.0.19",
@@ -44,6 +52,7 @@
     "react-native-keyboard-controller": "1.21.9",
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
     "react-native-worklets": "0.10.1",
     "whisper.rn": "0.7.4"
   },
@@ -53,6 +62,7 @@
     "typescript": "~6.0.3"
   },
   "allowScripts": {
-    "llama.rn@0.12.9": true
+    "llama.rn@0.12.9": true,
+    "@kittentts/react-native@1.2.0": true
   }
 }

@@ -18,13 +18,17 @@ These are **not** claimed as passed. The agent must mark each result PASS/FAIL w
 - Job detail initially FULL PAGE with NO "save to your applications" popup. User-initiated popover and real external URL.
 - Resume large preview plus editable summary, no filename label/status banner and no how-it-works marketing block.
 - Ask Brief has model-generated, conversation-specific bottom suggestions; hide suggestions when no local model is installed. Text-only models keep image attachment disabled; a compatible vision model plus projector enables local image chat.
+- Settings opens from the profile menu with no floating navigation or plus button. The main directory contains Profile, AI & Offline, Preferences, and Other groups; each destination has a working page, back button, and swipe-back. Display name, currency, and time format save and update the app immediately; verify time changes in Calendar and scheduled event rows.
+- Brief AI shows Qwen3-VL 2B Instruct Q4_K_M, actual installation state, setup/download progress and cancellation, retry after failure, text and real image checks, advanced import options, and model removal. It never labels image inference ready before the vision check passes. Low storage, missing/corrupt files, and failed initialization retain a recoverable state.
+- Voice interviews lists catalog metadata for Standard and More accurate; download progress/cancel/retry and checksum verification work. Verify microphone permission/test, voice choices limited to available offline voices, one persisted speaking-speed choice, stoppable TTS sample, and privacy copy that states transcripts persist while microphone audio is discarded after transcription.
+- Advanced & diagnostics reports installed model/speech state and storage, runs the local AI check, refreshes rates with an honest offline failure, opens performance details and troubleshooting, and replays onboarding. Restart the app to confirm every preference and model selection persists.
 
 ## Functional
 - First run skip/onboard/resume; reopen app persists profile.
 - Add manual job from the draggable sheet; only company and position required, More details starts collapsed. Test sheet dismissal and keyboard avoidance.
-- Add a job with the full-screen camera and gallery: permissions, capture, preview, retake, use photo, OCR, Local AI present/missing/failing, editable review, save.
+- Add a job with the PiP-style camera panel and gallery: permissions, capture, preview, retake, use photo, tap-outside/close dismissal, OCR, Local AI present/missing/failing, editable review, save.
 - Paste a job link: valid readable page, blocked/unsupported page, invalid URL, network timeout, local model present/missing; verify manual fallback and editable review.
-- Import PDF digital text locally, editable summary; evaluate DOCX/scanned fallback, OS preview/share.
+- Import a digital PDF, OCR a resume image, and run local-model profile extraction; review/edit extracted fields, test missing-model and extraction-failure fallbacks, replace a resume without losing the old one on copy/save failure, and verify scanned-PDF/DOCX manual fallback plus OS preview/share.
 - Multiple applications and status updates persist across restart; search/sort works.
 - Calendar create, mark dates, remove; time zone and scheduled notifications follow-ups tracked.
 - Fetch real Jobicy results online, offline failure displayed without app crash, no invented salary or employer logo.

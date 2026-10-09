@@ -1,4 +1,4 @@
-import React,{useEffect,useState,useRef} from 'react';
+import React,{useCallback,useEffect,useState,useRef} from 'react';
 import {Alert,AppState,Linking,ScrollView,TextInput,View} from 'react-native';
 import {KeyboardAvoidingView} from 'react-native-keyboard-controller';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -8,13 +8,15 @@ import {mockInterview,mockFeedback,stopGeneration,isCancelled,releaseVision,MODE
 import {LiveMascot} from '../components/LiveMascot';
 import {EmptyState,InlineError,MessageBubble,ModelSetupCard,useModelInstalled} from '../components/States';
 import {FeedbackCard,MicButton,SessionReviewSheet,SpeakingBars} from '../components/Voice';
+import {FormSheet} from '../components/FormSheet';
 import {hasProfileDetails} from '../lib/profile';
 import {MOCK_BEGIN as BEGIN,MOCK_FINISH as FINISH} from '../lib/prompts';
 import {MOCK_MODES,type MockMode} from '../lib/agent/types';
 import {voiceReducer,initialVoiceState,canListen,PHASE_LABEL,type VoiceEvent,type VoiceState} from '../lib/voice/machine';
 import {answersGiven,isFinished,questionsAsked,shouldWrapUp,summarizeSessions,formatDuration,TARGET_QUESTIONS,type SessionSummary} from '../lib/voice/sessions';
 import {createRecorder,loadSpeech,releaseSpeech,requestMic,speechInstalled,transcribe} from '../lib/voice/stt';
-import {speak,speechRate,stopSpeaking,voiceChoice} from '../lib/voice/tts';
+import {kittenVoice as getKittenVoice,speak,speechRate,stopSpeaking,ttsEngine,voiceChoice} from '../lib/voice/tts';
+import {installKitten,kittenCacheInfo,releaseKitten,subscribeKittenDownload,isKittenInstalling,verifyKitten} from '../lib/voice/kitten';
 import type {VoiceChoice} from '../lib/voice/catalog';
 import {throttle} from '../lib/throttle';
 import {CloudHalo,CompanyLogo,Icon,StatusPill,Tap,Txt,useKeyboardVisible,useFloatingNavClearance} from '../components/Ui';import type {Message} from '../types';
@@ -36,10 +38,12 @@ export function MockScreen(){const {applications,profile,mockJob:job,mockSetup,o
  const [vs,setVs]=useState<VoiceState>(initialVoiceState());const vsRef=useRef(vs);
  const fire=(e:VoiceEvent)=>{const n=voiceReducer(vsRef.current,e);if(n===vsRef.current)return false;vsRef.current=n;setVs(n);return true;};
  const reset=(s:VoiceState)=>{vsRef.current=s;setVs(s);};
- // Voice: needs verified offline speech models + an on-device voice. Otherwise the same interview runs as text.
- const [voice,setVoice]=useState<{installed:boolean,choice?:VoiceChoice}>({installed:false});
+ // The session keeps its current system voice by default; Kitten is an explicit installed voice option.
+ const [voice,setVoice]=useState<{installed:boolean,choice?:VoiceChoice,engine:'system'|'kitten',kittenVoice?:string,kittenCached:boolean,kittenSupported:boolean}>({installed:false,engine:'system',kittenCached:false,kittenSupported:true});
  const [voiceMode,setVoiceMode]=useState(false),[voiceLoading,setVoiceLoading]=useState(false),[rate,setRate]=useState(1),[handsFree,setHandsFree]=useState(false),[micIssue,setMicIssue]=useState<''|'denied'|'blocked'>('');
- const voiceReady=voice.installed&&!!voice.choice?.voice;
+ const [voiceSetup,setVoiceSetup]=useState(false),[kittenProgress,setKittenProgress]=useState<number|null>(null),[kittenSetupError,setKittenSetupError]=useState(''),[ttsNotice,setTtsNotice]=useState('');
+ const installingKitten=useRef(false);
+ const voiceReady=voice.installed&&(voice.engine==='kitten'?(voice.kittenSupported?voice.kittenCached&&!!voice.kittenVoice:voice.choice?.offline==='verified'):!!voice.choice?.voice);
  const level=useSharedValue(0);const rec=useRef<Recorder|null>(null),speakId=useRef(0),via=useRef<'voice'|'text'>('text');
  const scroll=useRef<ScrollView>(null);
  const streamTo=useRef(throttle(setStreamNow,80)).current;const setStream=(t:string)=>{if(!t){streamTo.cancel();setStreamNow('');}else streamTo(t);};
@@ -49,7 +53,22 @@ export function MockScreen(){const {applications,profile,mockJob:job,mockSetup,o
  const meta=messages[0]?.meta,mode:MockMode=meta?.mode??pickMode,question=meta?.question??mockSetup.question,topic=meta?.topic??mockSetup.topic;
 
  useEffect(()=>{setPickMode(mockSetup.mode);},[mockSetup]);
- useEffect(()=>{void Promise.all([speechInstalled(),voiceChoice(),speechRate(),getPref('voiceHandsFree')]).then(([ok,choice,r,hf])=>{setVoice({installed:ok,choice});setRate(r);setHandsFree(hf==='yes');});},[]);
+ const refreshVoice=useCallback(async()=>{
+  const [ok,choice,r,hf,engine,selected,cache]=await Promise.all([speechInstalled(),voiceChoice(),speechRate(),getPref('voiceHandsFree'),ttsEngine(),getKittenVoice(),kittenCacheInfo().catch(()=>null)]);
+  setVoice({installed:ok,choice,engine,kittenVoice:selected,kittenCached:!!cache?.isCached,kittenSupported:!!cache});setRate(r);setHandsFree(hf==='yes');
+ },[]);
+ // Mock isn't keep-alive (App.tsx), so mount=focus and unmount=blur; the cleanup releases mic/speech.
+ useEffect(()=>{
+  void refreshVoice().catch(()=>{});
+  return()=>{
+   const phase=vsRef.current.phase;
+   if(phase==='listening'||phase==='speaking'||phase==='synthesizing')fire({type:'BACKGROUND'});
+   if(phase==='speaking'||phase==='synthesizing')void stopSpeaking();
+   if(phase==='listening')void dropRecording();
+   void releaseSpeech();void releaseKitten();
+  };
+ },[refreshVoice]);
+ useEffect(()=>subscribeKittenDownload(progress=>setKittenProgress(isKittenInstalling()?Math.round(progress*100):null)),[]);
  useEffect(()=>{if(job)return;void listThreadMessages('').then(all=>setSessions(summarizeSessions(all).filter(s=>applications.some(a=>a.id===s.applicationId)).slice(0,8))).catch(()=>{});},[job,applications.length]);
  useEffect(()=>{let active=true;setLoaded('');if(!thread){setMsgs([]);return;}
   void (async()=>{let rows=await listMessages(thread);
@@ -66,13 +85,13 @@ export function MockScreen(){const {applications,profile,mockJob:job,mockSetup,o
   void releaseVision().then(loadSpeech).catch(e=>{if(active){setVoiceMode(false);Alert.alert('Voice isn’t available',`${(e as Error).message}\nYou can continue by typing.`);}}).finally(()=>{if(active)setVoiceLoading(false);});
   return()=>{active=false};},[voiceMode,voiceReady]);
  // Leaving the app pauses: speech stops, the mic closes, nothing is recorded in the background.
- useEffect(()=>{const sub=AppState.addEventListener('change',st=>{if(st==='active')return;const p=vsRef.current.phase;if(p==='speaking')void stopSpeaking();if(p==='listening')void dropRecording();fire({type:'BACKGROUND'});});return()=>sub.remove();},[]);
- useEffect(()=>()=>{void stopSpeaking();void rec.current?.cancel();void releaseSpeech();},[]);
+ useEffect(()=>{const sub=AppState.addEventListener('change',st=>{if(st==='active')return;const p=vsRef.current.phase;fire({type:'BACKGROUND'});if(p==='speaking'||p==='synthesizing')void stopSpeaking();if(p==='listening')void dropRecording();void releaseKitten();});return()=>sub.remove();},[]);
+ useEffect(()=>()=>{void stopSpeaking();void rec.current?.cancel();void releaseSpeech();void releaseKitten();},[]);
 
  async function save(m:Omit<Message,'id'|'thread'|'createdAt'>){const msg:Message={id:uid('mock'),thread,createdAt:new Date().toISOString(),...m};await saveMessage(msg);setMsgs([...msgs.current,msg]);return msg;}
  const speakOn=()=>voiceMode&&voiceReady&&!voiceLoading;
 
- async function begin(){if(!job||installed===false)return;if(!fire({type:'SEND',text:BEGIN}))return;await save({role:'user',content:BEGIN,meta:{mode:pickMode,question:mockSetup.question,topic:mockSetup.topic}});await nextTurn();}
+ async function begin(){if(!job||installed===false)return;if(voiceMode&&!voiceReady){setVoiceSetup(true);return;}if(!fire({type:'SEND',text:BEGIN}))return;await save({role:'user',content:BEGIN,meta:{mode:pickMode,question:mockSetup.question,topic:mockSetup.topic}});await nextTurn();}
  async function submit(text?:string){const t=(text??vsRef.current.draft).trim();if(!t||!fire({type:'SEND',text:t}))return;setValue('');await save({role:'user',content:t,meta:{via:via.current}});via.current='text';await nextTurn();}
  /** The interviewer's next question (or, after the last answer of a full interview, the feedback). */
  async function nextTurn(){if(!job)return;
@@ -99,11 +118,12 @@ export function MockScreen(){const {applications,profile,mockJob:job,mockSetup,o
  async function speakCurrent(){
   const turn=vsRef.current.turn,text=[...msgs.current].reverse().find(m=>m.role==='assistant'&&!m.feedback)?.content;
   if(!text){fire({type:'SPOKEN',turn});return;}
+  setTtsNotice('');
   try{speakId.current=await speak(text,voice.choice?.voice,rate,(id,finished)=>{
     if(id!==speakId.current||!fire({type:'SPOKEN',turn}))return;
     // Hands-free: open the mic after the question, with a short gap so the speaker's tail isn't recorded.
     if(finished&&handsFree)setTimeout(()=>{if(vsRef.current.phase==='ready'&&vsRef.current.turn===turn)void startListening();},400);
-   });}
+   },()=>{if(vsRef.current.phase==='synthesizing'&&vsRef.current.turn===turn)fire({type:'PLAYBACK_STARTED',turn});},setTtsNotice,voice.choice?.offline);}
   catch(e){fire({type:'FAILED',error:`The voice couldn’t play. ${(e as Error).message}`});}}
  function replay(){if(fire({type:'SPEAK',turn:vsRef.current.turn}))void speakCurrent();}
  async function stopTalking(){await stopSpeaking();fire({type:'SPOKEN',turn:vsRef.current.turn});}
@@ -125,8 +145,8 @@ export function MockScreen(){const {applications,profile,mockJob:job,mockSetup,o
   }catch(e){fire({type:'FAILED',error:`Transcription failed. ${(e as Error).message}`});}}
  async function dropRecording(){const r=rec.current;rec.current=null;level.set(0);await r?.cancel();}
  async function cancelListening(){await dropRecording();fire({type:'CANCEL_LISTENING'});}
- async function pause(){const p=vsRef.current.phase;if(!fire({type:'PAUSE'}))return;if(p==='speaking')await stopSpeaking();if(p==='listening')await dropRecording();}
- async function end(){const p=vsRef.current.phase;if(!fire({type:'END'}))return;if(p==='speaking')await stopSpeaking();await finish();}
+ async function pause(){const p=vsRef.current.phase;if(!fire({type:'PAUSE'}))return;if(p==='speaking'||p==='synthesizing')await stopSpeaking();if(p==='listening')await dropRecording();}
+ async function end(){const p=vsRef.current.phase;if(!fire({type:'END'}))return;if(p==='speaking'||p==='synthesizing')await stopSpeaking();await finish();}
  async function retry(){const last=msgs.current[msgs.current.length-1];
   if(last?.content===FINISH)return end();
   if(last?.role==='user'){if(fire({type:'RETRY',to:'thinking'}))await nextTurn();return;}
@@ -134,6 +154,20 @@ export function MockScreen(){const {applications,profile,mockJob:job,mockSetup,o
  async function continueSession(){if(fire({type:'CONTINUE'}))await nextTurn();}
  function newSession(){Alert.alert('Start a new session?','This one is saved, so you can review it later and Ask Brief can find its feedback.',[{text:'Cancel',style:'cancel'},{text:'New session',onPress:()=>void (async()=>{await stopSpeaking();await dropRecording();await archiveThread(thread,`${thread}:${Date.now()}`);setMsgs([]);reset({phase:'ready',turn:0,draft:''});})().catch(e=>Alert.alert('Couldn’t start a new session',(e as Error).message))}]);}
  const toggleHandsFree=()=>{const v=!handsFree;setHandsFree(v);void setPref('voiceHandsFree',v?'yes':'');};
+ function chooseVoiceMode(){
+  if(!voice.installed){setVoiceSetup(true);return;}
+  if(voice.engine==='kitten'&&voice.kittenSupported&&(!voice.kittenCached||!voice.kittenVoice)){setVoiceSetup(true);return;}
+  if(voice.engine==='kitten'&&!voice.kittenSupported&&voice.choice?.offline!=='verified'){setVoiceSetup(true);return;}
+  if(voice.engine==='system'&&!voice.choice?.voice){setVoiceSetup(true);return;}
+  setVoiceMode(true);
+ }
+ async function installKittenForInterview(){
+  if(installingKitten.current)return;
+  installingKitten.current=true;setKittenSetupError('');setKittenProgress(0);
+  try{const cache=await installKitten();await verifyKitten();await releaseKitten();setVoice(current=>({...current,kittenCached:cache.isCached,kittenSupported:true}));}
+  catch(e){setKittenSetupError((e as Error).message||'The offline voice could not be installed.');}
+  finally{setKittenProgress(null);installingKitten.current=false;}
+ }
  async function openReview(s:SessionSummary){setReview({s,ms:(await listThreadMessages(s.thread)).filter(m=>m.thread===s.thread)});}
 
  // ---------- Job picker + history ----------
@@ -181,7 +215,7 @@ export function MockScreen(){const {applications,profile,mockJob:job,mockSetup,o
   <Txt color={C.muted}>{question?`Brief will ask “${question}”, then rate your answer and help you improve it. Try as many times as you like.`:`About ${TARGET_QUESTIONS} questions, then feedback. Questions use this job’s description${hasProfileDetails(profile)?' and the resume details you allowed':''}.`} Everything runs on your phone.</Txt>
   {!question&&<View accessibilityRole="radiogroup" style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>{MOCK_MODES.map(m=><Tap key={m.value} accessibilityRole="radio" accessibilityState={{selected:pickMode===m.value}} onPress={()=>setPickMode(m.value)} style={pill(pickMode===m.value)}><Txt size={13} bold color={pickMode===m.value?C.white:C.ink}>{m.label}</Txt></Tap>)}</View>}
   <View accessibilityRole="radiogroup" style={{flexDirection:'row',gap:8}}>
-   <Tap accessibilityRole="radio" accessibilityState={{selected:voiceMode,disabled:!voiceReady}} disabled={!voiceReady} onPress={()=>setVoiceMode(true)} style={[pill(voiceMode),{flexDirection:'row',alignItems:'center',gap:6,opacity:voiceReady?1:0.5}]}><Icon name="mic-outline" size={15} color={voiceMode?C.white:C.ink}/><Txt size={13} bold color={voiceMode?C.white:C.ink}>Speak</Txt></Tap>
+   <Tap accessibilityRole="radio" accessibilityState={{selected:voiceMode,disabled:!voice.installed}} disabled={!voice.installed} onPress={chooseVoiceMode} style={[pill(voiceMode),{flexDirection:'row',alignItems:'center',gap:6,opacity:voice.installed?1:0.5}]}><Icon name="mic-outline" size={15} color={voiceMode?C.white:C.ink}/><Txt size={13} bold color={voiceMode?C.white:C.ink}>Speak</Txt></Tap>
    <Tap accessibilityRole="radio" accessibilityState={{selected:!voiceMode}} onPress={()=>setVoiceMode(false)} style={[pill(!voiceMode),{flexDirection:'row',alignItems:'center',gap:6}]}><Icon name="chatbubble-outline" size={15} color={!voiceMode?C.white:C.ink}/><Txt size={13} bold color={!voiceMode?C.white:C.ink}>Type</Txt></Tap>
   </View>
   {!!voiceNote&&<Tap accessibilityRole="button" onPress={()=>go('settings')}><Txt size={12} color={C.muted}>{voiceNote} <Txt size={12} bold color={C.blue}>Settings</Txt></Txt></Tap>}
@@ -201,7 +235,7 @@ export function MockScreen(){const {applications,profile,mockJob:job,mockSetup,o
   {needsContinue&&<Tap accessibilityRole="button" onPress={()=>void continueSession()} style={[small,{alignSelf:'center'}]}><Icon name="play" size={15} color={C.blue}/><Txt bold size={14} color={C.blue}>Continue interview</Txt></Tap>}
   {needsFeedback&&<Tap accessibilityRole="button" onPress={()=>void end()} style={[small,{alignSelf:'center'}]}><Txt bold size={14} color={C.blue}>Get my feedback</Txt></Tap>}
   {phase==='paused'&&<View style={{flexDirection:'row',gap:8,justifyContent:'center'}}><Tap accessibilityRole="button" onPress={()=>fire({type:'RESUME'})} style={[small,{backgroundColor:C.blue}]}><Icon name="play" size={15} color={C.white}/><Txt bold size={14} color={C.white}>Resume</Txt></Tap></View>}
-  {phase==='speaking'&&<View style={{flexDirection:'row',gap:8,justifyContent:'center'}}><Tap accessibilityRole="button" onPress={()=>void stopTalking()} style={small}><Icon name="stop" size={14} color={C.blue}/><Txt bold size={14} color={C.blue}>Stop speaking</Txt></Tap></View>}
+  {(phase==='speaking'||phase==='synthesizing')&&<View style={{flexDirection:'row',gap:8,justifyContent:'center'}}><Tap accessibilityRole="button" onPress={()=>void stopTalking()} style={small}><Icon name="stop" size={14} color={C.blue}/><Txt bold size={14} color={C.blue}>Stop speaking</Txt></Tap></View>}
   {phase==='thinking'&&<View style={{alignItems:'center'}}><Tap accessibilityRole="button" accessibilityLabel="Stop generating" onPress={()=>void stopGeneration()} style={small}><Icon name="stop" size={14} color={C.blue}/><Txt bold size={14} color={C.blue}>Stop</Txt></Tap></View>}
   {/* Voice: big mic; review the transcript before it's sent */}
   {voiceMode&&voiceReady&&started&&(phase==='ready'||phase==='listening')&&!needsContinue&&!needsFeedback&&<View style={{alignItems:'center',gap:6}}>
@@ -227,6 +261,19 @@ export function MockScreen(){const {applications,profile,mockJob:job,mockSetup,o
    <TextInput accessibilityLabel="Type your answer" value={value} onChangeText={setValue} style={{flex:1,padding:8,color:C.ink,maxHeight:120}} placeholder={voiceMode&&voiceReady?'Or type your answer…':'Type your answer…'} placeholderTextColor={C.soft} multiline/>
    <Tap accessibilityRole="button" accessibilityLabel="Send answer" disabled={!value.trim()} onPress={()=>{via.current='text';void submit(value);}} style={{backgroundColor:C.blue,opacity:value.trim()?1:.5,borderRadius:20,width:40,height:40,alignItems:'center',justifyContent:'center'}}><Icon name="arrow-up" color={C.white}/></Tap>
   </View>}
+  {!!ttsNotice&&<Tap accessibilityRole="button" onPress={()=>setTtsNotice('')}><Txt size={12} color={C.muted} style={{textAlign:'center'}}>{ttsNotice}</Txt></Tap>}
  </View>
+ <FormSheet visible={voiceSetup} title="Set up voice interviews" onClose={()=>setVoiceSetup(false)} doneLabel="Done" onDone={()=>setVoiceSetup(false)}>
+  <View style={{gap:12,paddingBottom:8}}>
+   <Txt size={14} color={C.muted} style={{lineHeight:20}}>{!voice.installed?'Install an offline speech recognition model before answering with your voice.':voice.engine==='kitten'&&!voice.kittenSupported?'This build does not have the Kitten native module. Rebuild Brief or switch to an installed offline phone voice.':voice.engine==='kitten'&&!voice.kittenCached?'Install the offline Mini voice model to continue with your selected interviewer voice.':voice.engine==='kitten'&&!voice.kittenVoice?'Choose a Kitten voice in Voice interviews settings, then return here.':'Choose an offline interviewer voice in Voice interviews settings.'}</Txt>
+   {voice.engine==='kitten'&&voice.kittenSupported&&!voice.kittenCached&&<>
+    <Txt size={13} color={C.muted}>KittenTTS Mini · about 83 MB plus supporting assets. Speech synthesis runs on this phone after setup.</Txt>
+    {kittenProgress!==null&&<View accessibilityRole="progressbar" accessibilityLabel="Downloading KittenTTS Mini" accessibilityValue={{min:0,max:100,now:kittenProgress}} style={{height:5,borderRadius:3,backgroundColor:C.line,overflow:'hidden'}}><View style={{height:5,width:`${kittenProgress}%`,backgroundColor:C.blue}}/></View>}
+    {!!kittenSetupError&&<View accessibilityRole="alert"><Txt size={13} color={C.danger}>{kittenSetupError}</Txt></View>}
+    <Tap accessibilityRole="button" disabled={kittenProgress!==null} onPress={()=>void installKittenForInterview()} style={{minHeight:46,borderRadius:13,backgroundColor:C.blue,justifyContent:'center',alignItems:'center',opacity:kittenProgress!==null?0.6:1}}><Txt bold color={C.white}>{kittenProgress===null?'Download voice model':`Downloading · ${kittenProgress}%`}</Txt></Tap>
+   </>}
+   <Tap accessibilityRole="button" onPress={()=>{setVoiceSetup(false);go('settings');}} style={{minHeight:42,justifyContent:'center',alignItems:'center'}}><Txt size={14} bold color={C.blue}>Open Voice interviews settings</Txt></Tap>
+  </View>
+ </FormSheet>
  </KeyboardAvoidingView>;
 }

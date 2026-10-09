@@ -1,8 +1,7 @@
 {
   "expo": {
     "name": "brief",
-    "slug": "brief-local-ai",
-    "owner": "brief-app",
+    "slug": "brief-app",
     "scheme": "brief",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -17,7 +16,11 @@
     "android": {
       "package": "com.brief.localai",
       "permissions": [
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
@@ -60,15 +63,20 @@
           "color": "#1677F2"
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-audio"
     ],
     "experiments": {
       "reactCompiler": false
     },
     "icon": "./assets/icon.png",
     "extra": {
+      "expo-navigation-bar": {
+        "enforceContrast": false,
+        "style": "dark"
+      },
       "eas": {
-        "projectId": "9abd7ce0-d476-4f9a-951a-d9e7a36990d0"
+        "projectId": "90f07846-9897-46bc-b68e-fe04d81d825c"
       }
     }
   }
