@@ -22,6 +22,69 @@
 - No automated E2E mobile device tests, no actual APK/IPA generated.
 - Some layout details and performance need native device refinement.
 
+## Change log
+
+### 2026-10-09 — dependency repair, logic tests, P0 fixes (no device yet)
+- **Dependencies:** installed and pinned; `npx expo-doctor` 21/21; `npm run typecheck` clean; `npx expo export --platform android` bundles. `llama.rn` pinned to **0.12.9** (npm `latest` tag points at `0.13.0-rc.7`, a release candidate); its native-artifact postinstall is approved via `allowScripts`. Removed unused `expo-linking`/`expo-speech`/`react-native-svg`/`expo-status-bar` (duplicate `expo-constants`); added required `expo-font` peer. Deleted `babel.config.js` (Expo applies `babel-preset-expo` itself; the file broke Metro). `newArchEnabled` removed from `app.json` (always on in SDK 57); llama.rn plugin option renamed to `enableOpenCLAndHexagon`.
+- **Jobicy adapter bug fixes (verified against live API):** `jobType` is an array (was stored as an array in a string field); salary fields are `salaryMin/salaryMax/salaryCurrency/salaryPeriod` (adapter read nonexistent `annualSalary*`, so salary was always "Not specified"). Missing salary is now `""`, rendered "Salary not listed". HTML → text keeps paragraphs/bullets and decodes entities. Offline fetch shows a clear message. Jobicy credit link added per its API notice.
+- **Testable seams:** `src/lib/tracker.ts` (progress buckets by week start, search/sort with pipeline status order), `src/lib/prompts.ts` (prompt contracts v1 with fenced untrusted text, strict extraction parsing that drops unknown keys, clamped profile context). `tests/logic.test.mjs` covers them (Node 24 runs the TS directly).
+- **AI runtime:** Qwen3 thinking disabled (`enable_thinking:false`, `jinja:true`), `<think>` stripped; concurrent loads share one promise; importing a model releases the old context; OOM/load errors map to actionable messages; Settings shows real load progress and measured load time + tokens/s.
+- **Navigation/UX:** Android hardware back (overlay → tab root → Home → exit); floating bar hides while the keyboard is up; chat/mock composers use `KeyboardAvoidingView` `padding` on both platforms (Android is edge-to-edge in SDK 57, so `adjustResize` alone does not lift content) — **needs device check**; job detail save options are a real `Modal` sheet (was absolutely positioned inside scroll content); "Practice mock interview" opens Mock with that job; missing model shows an Open Settings button; haptic on save.
+- **Files:** model and resume imports move (not copy) the picker's cached file, avoiding a second ~1 GB copy; removing/replacing a resume deletes the stored file.
+
+### 2026-10-09 — design feedback round 1 (JS only, no native rebuild)
+- **Cloud halo** (`CloudHalo` in `Ui.tsx`) behind the mascot on Home and Mock (picker + session): overlapping puffs drifting out of phase, native-driver loop, static under Reduce Motion. Built as an animated view rather than a GIF: GIF has 1-bit transparency (jagged edges on a soft cloud), can't follow Reduce Motion, and animated GIF on Android would need a new native module + rebuild. Mascot slightly smaller (Home 120→104, Mock picker 160→140).
+- **Explore:** defaults to Jobicy `geo=philippines` (remote jobs open to PH applicants: Philippines, APAC, Anywhere — verified live). Subtle filters button → sheet with region (Philippines / Asia-Pacific / All) and job type (filtered on-device; Jobicy has no type param). Search clear button. Explore stays mounted once visited, so query, filters, results and scroll survive job detail and tab switches.
+- **Company logos:** Jobicy `companyLogo` (all raster PNG/JPG/WebP in sampled feed) shown in Explore, job detail, and saved applications (`logoUrl`); falls back to a neutral briefcase tile when missing/offline. Manual jobs never get a guessed logo.
+- **Job detail:** long descriptions collapse to 9 lines with Show more / Show less.
+- **iOS feel:** `Tap` gives touch-down highlight on every control; `Sheet` springs up (ratio 0.85 / 0.3 s), drag-down or tap-out dismisses, rubber-bands when pulled up, cross-fades under Reduce Motion; menus grow from their trigger (critically damped); large titles use negative tracking; 44 pt header targets.
+
+### 2026-10-09 — job description formatting
+- `src/lib/format.ts`: provider HTML → a small stored text format (`## heading`, `• bullet`, `**bold**`, blank line between blocks). Handles real Jobicy patterns: `<h2>/<h3>`, bold-only "Overview:" paragraphs as headings, fake `·` bullet paragraphs, `<li><strong>Label:</strong>`, `<li><p>`, `<br>`, numeric entities, Unicode spaces, space-before-punctuation left by removed links. Verified on 50 live PH-filtered listings: 0 leftover tags/entities, 0 empty blocks.
+- `Description` component renders headings, hanging-indent bullets, inline bold labels, selectable 15/22 body text; "Show more" collapses on whole blocks (never mid-bullet or on a dangling heading). Used on job detail and saved application detail. The same parser tidies OCR/typed descriptions ("Requirements:", "- item", "2) item"). Tests: `tests/format.test.mjs`; `npm test` now loads `tests/ts-resolve.mjs` so modules can import each other Metro-style.
+
+### 2026-10-09 — Application progress chart
+- `ProgressChart`: y-axis with round gridlines (`niceAxis`, 1/2/5×10ⁿ steps), value labels, rounded bars with a native CSS `linear-gradient` (New Architecture `experimental_backgroundImage`, solid fallback), date labels, legend + period total, honest empty state. Bars grow in with a critically damped spring on range change (static under Reduce Motion). Whole chart has one VoiceOver/TalkBack summary label.
+- Range pull-down (`PullDownMenu`, anchored under the pill, leading checkmark, selection haptic): Last 4 weeks (weekly), Last 8 weeks (weekly, alternate labels), Last 6 months (calendar months). Counts are applications the user reported as applied or later, by `appliedAt`.
+- `Popover` moved to `Ui.tsx` and shared by the + menu, profile menu and pull-downs.
+
+### 2026-10-09 — Explore cards, swipe to Interested, Saved merged into Interested
+- **Cards:** logo, title, company, location • type, bookmark top-right (status pill instead once past Interested, so a stray tap can't delete an applied job), salary with icon when listed, chips from Jobicy `jobIndustry` + `jobLevel` (Midweight→Mid-level, "Any" omitted). Detail page shows all chips.
+- **Swipe left** (`SwipeAction`, PanResponder + native-driver springs, no new native deps): 1:1 tracking, rubber-band past 88 px, haptic tick on crossing the threshold, flick commits, springs home with release velocity, only claims clearly horizontal drags. Already-tracked jobs reveal "In Brief" and don't re-commit. Also exposed as an accessibility action + bookmark button. One-time hint until the first Explore job is tracked.
+- **Status merge:** `saved` removed from `ApplicationStatus`; old rows load as `interested` (`normalizeApplication` in `db.listApplications`). Job detail sheet offers Interested or Applied; Add Job defaults to Interested. Un-bookmarking an Interested job removes it (confirms first if it has notes). Specs updated (SCREEN_INVENTORY, USER_JOURNEYS, ACCEPTANCE_TESTS).
+
+### 2026-10-09 — onboarding redesign (4 pages)
+- `OnboardingScreen`: native horizontal pager (`pagingEnabled`, native-driver scroll events) with dots that track the finger, light illustration parallax (off under Reduce Motion), Continue/Skip/Get started/Back, Android back steps pages. Layout measured in a 390×844 mock: all four pages fit without scrolling; smaller phones scroll within a page.
+- Functional, not placeholders: page 2 rows → `finishOnboarding()` then `openAddJob(intent)`; AddJobScreen consumes the intent once and starts library/camera import. Page 3 uploads via `pickResume`/`readResumeText` (honest notes for DOCX/scanned PDFs, offers manual entry), `ProfileForm` (pageSheet modal, keyboard-safe) saves name/goal/experience/education/skills, preview renders real profile data (`lib/profile.ts`, tested), AI toggle writes `useResumeForAI`. Everything saves to SQLite immediately.
+- Shared additions: `Primary` large + trailing icon, `Wordmark` (sized), `Sparkles`. Settings → "Show onboarding again" (`replayOnboarding`).
+
+### 2026-10-09 — interactive mascot
+- New faces from the user (SHOCKED, QUESTION, SAD, ERROR) cropped with pngjs to the exact `mascot-happy.png` frame (body bbox + 26 px; SAD's body is drawn 3 px left / 13 px higher, so its crop is offset to match). QUESTION's "???" was erased from the face and saved as `marks-question.png` so it can animate separately.
+- `LiveMascot`: all faces stay mounted (instant swaps, no first-decode flicker); press squish, escalating tap reactions, sparkle/??? marks, native-driver springs, timers cleaned up on unmount, screen-reader button with hint. `CloudHalo` now hides only its decorative puffs from accessibility so the mascot stays reachable.
+
+### 2026-10-09 — empty, loading and error states
+- `States.tsx`: `EmptyState` (LiveMascot mood + title + reason + actions), `JobsSkeleton`, `TypingDots`/`ThinkingBubble`, `InlineError` (retry), `ModelSetupCard`, `useModelInstalled`. Matrix in SCREEN_INVENTORY.
+- `fetchRemoteJobs` throws `JobsError` with `kind` 'offline' | 'server' (tested with a stubbed fetch), so Explore can say "You're offline" vs "Jobs couldn't load".
+- Ask Brief / Mock: setup card before any attempt when no model; composer disabled; retry re-asks for the last user message without duplicating it. Mock finish detection no longer relies on a flag argument.
+- Resume: real empty state; summary editing moved to the shared `ProfileForm` sheet; `importResume` shared with onboarding (honest notes for DOCX/scanned PDFs).
+- Add Job: OCR/AI progress steps, inline import errors with retry, non-blocking note when AI is missing or extraction fails (OCR text kept).
+- Startup: SQLite failure shows a recoverable error screen instead of an alert over a broken app.
+
+### 2026-10-09 — animation & interaction polish (needs a new native build)
+- Audit (improve-animations) → fixes (animate-expo). New native deps: Reanimated 4.5.1, Worklets 0.10.1, Gesture Handler 2.32, Keyboard Controller 1.21.9; `CADisableMinimumFrameDurationOnPhone` for 120 Hz.
+- Sheet and swipe-to-interested moved from PanResponder (JS thread) to Gesture Handler + Reanimated with momentum projection, rubber-banding and velocity handoff; sheet close no longer uses ease-in.
+- `Tap`: scale 0.97 / 120 ms press feedback (was opacity 0.6). Popovers (+ menu, profile, pull-down) exit the way they entered; scrim fades; + rotates to ×.
+- Lists reflow with LinearTransition (skipEntering on mount); Calendar month slide by direction + swipe + Today; chat/mock messages rise in (new only), thinking/error states fade; Resume preview crossfades; Explore results fade over the skeleton; onboarding pager on Reanimated with a one-time welcome entrance.
+- Fixes: chart no longer re-animates on every Home visit; Reduce Motion correct on first frame; keyboard "will" events; haptics only for meaningful commits.
+- Verified: typecheck, 38 tests, expo-doctor 21/21, Android bundle with 24 compiled worklets. **Feel not yet verified on device.**
+
+### 2026-10-09 — feedback: onboarding, sheets, filters, currency, status
+- Onboarding is a tour: page 2 rows and page 3 resume preview are informational (no chevrons, buttons, or AI toggle); resume is added later from Resume.
+- Sheet safe area: modal is edge-to-edge (`navigationBarTranslucent`) and a native `SafeAreaView` measures the bottom inset (Android nav bar / home indicator). New `scroll` mode (header-only drag) and pinned `footer`.
+- Explore filters: location, industry (22 Jobicy industries, API), job type incl. internship, experience ("Any"-level jobs match every level), posted within, salary listed — tested; count badge on the filter button.
+- Currency: `lib/currency.ts` (tested) + `lib/rates.ts`; Settings → Salary currency; salaries show "≈ ₱7.6M–10.1M / yr" with "Listed as …" on the job page.
+- "Add to Brief" is the only add action (bookmark, swipe, button, Add Job); confirmation toast replaces the system alert; `StatusTracker` (Interested → Applied → In review → Interview → Offer, plus reversible Not selected) replaces the status chips.
+
 ## Next tasks in order
 1. **P0**: `scripts/setup.sh` + `npm run typecheck` + Android dev build; fix dependency APIs, permissions, runtime import errors, SafeArea/keyboard collisions, design bugs.
 2. **P0**: import/test Qwen Q4 GGUF on actual target phone; run airplane-mode chat and mock; reduce prompt/context memory footprint as needed.

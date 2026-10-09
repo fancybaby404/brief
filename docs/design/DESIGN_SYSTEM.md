@@ -4,8 +4,10 @@
 Premium iOS feel, not visual noise. **A good job hunt organizer with a friendly briefcase**. Read `apple-design-reference.md` before modifying gestures and timing. Reference hierarchy: user-approved latest screenshots in `design/references/current/` > explicit product requirements here > earlier concepts (history).
 
 ## Identity
-- Brand: `brief` all lowercase, thick slightly rounded black lettering, mini mascot alongside.
+- Brand: `brief` all lowercase in **Fredoka Bold (700)** (`@expo-google-fonts/fredoka`, SIL OFL), black, mini mascot alongside. Loaded at startup with expo-font; falls back to the system font if loading fails. Wordmark does not scale with Dynamic Type.
 - Mascot: `assets/mascot-happy-original.png` user-supplied; `mascot-happy.png` automatically alpha-cropped for rendering. White 2D flat briefcase, heavy black outline, black feet, black dot eyes/smile/buckle, **NO ARMS/HANDS EVER**. Only compatible emotions via simple black ASCII-like face changes, not 3D and never another creature. Blue simple sparkle shapes or pale blue circle behind it are acceptable.
+- Faces (user-supplied, `assets/mascot/`, all cropped to the same 842×924 frame as `mascot-happy.png` so swaps never move the body): happy (default), shocked, question (with a separate "???" overlay), sad, error (x_x). `Mascot mood=` for static use.
+- Interactive mascot (`LiveMascot`, Home, Mock picker/session, Ask Brief, onboarding welcome): squish on touch-down; taps escalate — surprised + tilt left + blue sparkle marks, puzzled + tilt right + "???", happy hop, x_x dizzy wobble — with a light haptic; marks fade and the face settles ~1 s after the last tap. Tilt pivots on the feet. State moods: "question" while local AI is generating, "sad" on errors. Reduce Motion keeps faces/marks, drops movement.
 - Large mascot LEFT of dashboard's speech bubble. On chat/mock larger mascot in calm blue halo; do not overpopulate screens with clones.
 
 ## Palette
@@ -33,6 +35,15 @@ NO rainbow analytics cards; preserve provider logos only if legitimately availab
 - Only content should scroll; top header stable; avoid stacking too many frosted layers. Translucent navigation material where supported, fallback readable opaque white, never blur text itself.
 - Touch targets min 44x44 pt; headings and controls should remain legible at large Dynamic Type.
 - Maximal primary visual emphasis goes to the current job/action, not to decoration. Empty-state mascot accompanied by clear CTA; no excessive motivational slogans.
+
+## Motion system (`src/theme/motion.ts`)
+- Curves: ease-out `(0.23, 1, 0.32, 1)` for entering/exiting, ease-in-out `(0.77, 0, 0.175, 1)` for on-screen movement, sheet `(0.32, 0.72, 0, 1)`. Never ease-in on UI. UI animations stay under 300 ms; exits ~20% faster than entries.
+- Springs in (duration, dampingRatio): settle `400 / 1`, snap `400 / 0.8`, sheet `300 / 0.8`. Bounce only after a finger carried momentum.
+- Gestures (sheet drag, swipe-to-interested, calendar swipe) run on the UI thread with Gesture Handler + Reanimated: start from the current value, rubber-band at edges, decide by projected momentum, hand release velocity to the spring.
+- Press feedback everywhere (`Tap`): 0.97 scale in 120 ms on touch-down.
+- Not animated on purpose: tab switches, date selection, and screens/charts on mount for screens visited many times a day. No JS-built screen push transitions (needs a native stack). No recording visuals until voice input exists.
+- Haptics: success when a job is added, selection tick on status change or menu pick, impact at the swipe threshold and mascot taps. Never per frame, never the only feedback.
+- Reduce Motion: read synchronously on first frame; movement becomes short fades, feedback stays.
 
 ## Page-specific differences
 - Dashboard: mascot left, speech bubble right, `Application progress` REAL blue bars across rolling 4 weeks, direct list `Recent applications`. **Never** an Up Next banner, rainbow 3/4 tile stats or line graph.

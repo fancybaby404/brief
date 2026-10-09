@@ -2,19 +2,23 @@
   "expo": {
     "name": "brief",
     "slug": "brief-local-ai",
+    "owner": "brief-app",
     "scheme": "brief",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.brief.localai"
+      "bundleIdentifier": "com.brief.localai",
+      "infoPlist": {
+        "CADisableMinimumFrameDurationOnPhone": true
+      }
     },
     "android": {
       "package": "com.brief.localai",
       "permissions": [
-        "CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
@@ -29,14 +33,20 @@
         {
           "enableEntitlements": true,
           "forceCxx20": true,
-          "enableOpenCL": false
+          "enableOpenCLAndHexagon": false
         }
       ],
-      "expo-build-properties"
+      "expo-build-properties",
+      "expo-font"
     ],
     "experiments": {
       "reactCompiler": false
     },
-    "icon": "./assets/icon.png"
+    "icon": "./assets/icon.png",
+    "extra": {
+      "eas": {
+        "projectId": "9abd7ce0-d476-4f9a-951a-d9e7a36990d0"
+      }
+    }
   }
 }

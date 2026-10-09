@@ -18,7 +18,7 @@ export async function pickResume():Promise<string|null> {
   const src=res.assets[0].uri;const ext=res.assets[0].name?.toLowerCase().endsWith('.docx')?'docx':'pdf';
   if(!FileSystem.documentDirectory) throw new Error('Private document storage is unavailable');
   const dest=FileSystem.documentDirectory+'resume.'+ext;
-  await FileSystem.copyAsync({from:src,to:dest});return dest;
+  await FileSystem.deleteAsync(dest,{idempotent:true});await FileSystem.moveAsync({from:src,to:dest});return dest;
 }
 export async function pickModel():Promise<string|null> {
   const res=await DocumentPicker.getDocumentAsync({type:'*/*',copyToCacheDirectory:true});
@@ -26,7 +26,8 @@ export async function pickModel():Promise<string|null> {
   if(!res.assets[0].name.toLowerCase().endsWith('.gguf'))throw new Error('Please select a .gguf model file.');
   if(!FileSystem.documentDirectory) throw new Error('Private document storage is unavailable');
   const dest=FileSystem.documentDirectory+'brief-model.gguf';
-  await FileSystem.copyAsync({from:res.assets[0].uri,to:dest});return dest;
+  // Move, not copy: the picker already cached a private copy, and models are ~1 GB.
+  await FileSystem.deleteAsync(dest,{idempotent:true});await FileSystem.moveAsync({from:res.assets[0].uri,to:dest});return dest;
 }
 
 export async function readResumeText(uri:string):Promise<string> {
@@ -34,4 +35,17 @@ export async function readResumeText(uri:string):Promise<string> {
  const { extractText, isAvailable } = await import('expo-pdf-text-extract');
  if(!isAvailable()) throw new Error('Resume extraction requires a native development build.');
  return (await extractText(uri)).slice(0,14000);
+}
+export async function deleteLocalFile(uri:string) { if(uri) await FileSystem.deleteAsync(uri,{idempotent:true}); }
+/** Picks a resume, stores it privately, extracts digital-PDF text when possible, and removes a replaced file.
+ *  Returns the profile changes plus an honest note when text couldn't be read (DOCX / scanned PDF), or null if cancelled. */
+export async function importResume(currentUri:string):Promise<{resumeUri:string,resumeText:string,note:string}|null> {
+ const uri=await pickResume();if(!uri)return null;
+ let resumeText='',note='';
+ if(uri.endsWith('.pdf')){
+  try{resumeText=await readResumeText(uri);}catch{note='Your PDF is saved, but its text couldn’t be read on this device.';}
+  if(!resumeText&&!note)note='This PDF looks scanned, so there’s no text to read.';
+ }else note='Your DOCX is saved. Reading DOCX text isn’t supported yet.';
+ if(currentUri&&currentUri!==uri)await deleteLocalFile(currentUri);
+ return {resumeUri:uri,resumeText,note};
 }

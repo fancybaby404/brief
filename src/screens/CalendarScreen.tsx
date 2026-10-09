@@ -1,20 +1,54 @@
-import React,{useMemo,useState} from 'react';import {Alert,Pressable,ScrollView,View} from 'react-native';
-import {useBrief} from '../lib/appContext';import {C} from '../theme/tokens';import {Card,Field,Heading,Icon,Primary,SectionTitle,Txt} from '../components/Ui';import {uid} from '../lib/db';
-export function CalendarScreen(){const {events,applications,putEvent,removeEvent}=useBrief();const [month,setMonth]=useState(new Date().getMonth()),[year,setYear]=useState(new Date().getFullYear()),[day,setDay]=useState(new Date().getDate()),[adding,setAdding]=useState(false),[title,setTitle]=useState(''),[time,setTime]=useState('10:00'),[notes,setNotes]=useState('');
+import React,{useMemo,useState} from 'react';import {Alert,ScrollView,View} from 'react-native';
+import Reanimated,{FadeIn,FadeInLeft,FadeInRight,LayoutAnimationConfig} from 'react-native-reanimated';
+import {Directions,Gesture,GestureDetector} from 'react-native-gesture-handler';
+import {useBrief} from '../lib/appContext';import {C} from '../theme/tokens';import {Card,Field,Heading,Icon,Primary,SectionTitle,Txt,Tap,useReducedMotion} from '../components/Ui';import {uid} from '../lib/db';import {EmptyState} from '../components/States';
+import {EASE_OUT,LIST_REFLOW,ROW_IN,ROW_OUT} from '../theme/motion';
+
+// The new month arrives from the side you moved toward; a fade only with Reduce Motion.
+const MONTH_NEXT=FadeInRight.duration(220).easing(EASE_OUT),MONTH_PREV=FadeInLeft.duration(220).easing(EASE_OUT),MONTH_FADE=FadeIn.duration(150).easing(EASE_OUT);
+const pad=(n:number)=>String(n).padStart(2,'0');
+
+export function CalendarScreen(){const {events,putEvent,removeEvent}=useBrief();const reduce=useReducedMotion();
+ const today=new Date();
+ const [month,setMonth]=useState(today.getMonth()),[year,setYear]=useState(today.getFullYear()),[day,setDay]=useState(today.getDate()),[dir,setDir]=useState(0),[adding,setAdding]=useState(false),[title,setTitle]=useState(''),[time,setTime]=useState('10:00'),[notes,setNotes]=useState('');
  const first=new Date(year,month,1).getDay(),length=new Date(year,month+1,0).getDate();const cells=[...Array(first).fill(0),...Array.from({length},(_,i)=>i+1)];
- const selected=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+ const selected=`${year}-${pad(month+1)}-${pad(day)}`;
  const monthLabel=new Date(year,month,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
- const upcoming=useMemo(()=>events.slice().sort((a,b)=>a.date.localeCompare(b.date)),[events]);
- function move(delta:number){const d=new Date(year,month+delta,1);setYear(d.getFullYear());setMonth(d.getMonth());setDay(1)}
+ const isThisMonth=year===today.getFullYear()&&month===today.getMonth();
+ const todayKey=today.toISOString().slice(0,10);
+ const upcoming=useMemo(()=>events.filter(e=>e.date.slice(0,10)>=todayKey).sort((a,b)=>a.date.localeCompare(b.date)),[events,todayKey]);
+ const marked=useMemo(()=>new Set(events.map(e=>e.date.slice(0,10))),[events]);
+ function move(delta:number){const d=new Date(year,month+delta,1);setDir(delta);setYear(d.getFullYear());setMonth(d.getMonth());setDay(1);}
+ function goToday(){setDir(year*12+month>today.getFullYear()*12+today.getMonth()?-1:1);setYear(today.getFullYear());setMonth(today.getMonth());setDay(today.getDate());}
+ // Swipe the grid to change month. Callbacks run on the RN runtime: they only set state once per fling.
+ const swipe=useMemo(()=>Gesture.Race(
+  Gesture.Fling().direction(Directions.LEFT).runOnJS(true).onEnd(()=>move(1)),
+  Gesture.Fling().direction(Directions.RIGHT).runOnJS(true).onEnd(()=>move(-1)),
+ ),[year,month]);
  async function add(){if(!title.trim())return Alert.alert('Add event title');await putEvent({id:uid('event'),applicationId:null,title:title.trim(),date:selected+'T'+time+':00',notes});setAdding(false);setTitle('');setNotes('');}
- return <ScrollView contentContainerStyle={{padding:18,paddingBottom:125,gap:15}}><Heading>Calendar</Heading><Txt color={C.muted}>Stay on top of interviews, follow-ups, and deadlines.</Txt>
- <Card><View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:16}}><Pressable onPress={()=>move(-1)}><Icon name="chevron-back" color={C.blue}/></Pressable><Txt bold>{monthLabel}</Txt><Pressable onPress={()=>move(1)}><Icon name="chevron-forward" color={C.blue}/></Pressable></View>
- <View style={{flexDirection:'row',flexWrap:'wrap'}}>{['S','M','T','W','T','F','S'].map((d,i)=><View key={i} style={{width:'14.285%',alignItems:'center',paddingVertical:6}}><Txt size={11} color={C.muted}>{d}</Txt></View>)}
- {cells.map((n,i)=><Pressable onPress={()=>n&&setDay(n)} key={i} style={{width:'14.285%',height:42,alignItems:'center',justifyContent:'center'}}><View style={{height:32,width:32,backgroundColor:n===day?C.blue:'transparent',borderRadius:17,justifyContent:'center',alignItems:'center'}}><Txt color={n===day?C.white:n?C.ink:C.soft} size={13}>{n||''}</Txt>{n>0&&events.some(e=>e.date.slice(0,10)===`${year}-${String(month+1).padStart(2,'0')}-${String(n).padStart(2,'0')}`)&&<View style={{backgroundColor:n===day?C.white:C.blue,width:4,height:4,borderRadius:2}}/>}</View></Pressable>)}
- </View></Card>
- <SectionTitle right="Add event" onRight={()=>setAdding(!adding)}>Upcoming events</SectionTitle>
- {adding&&<Card><Txt bold>New event · {selected}</Txt><Field label="Event" value={title} onChangeText={setTitle} placeholder="Interview with..."/><Field label="Time (24h HH:MM)" value={time} onChangeText={setTime}/><Field label="Notes" value={notes} onChangeText={setNotes}/><Primary label="Save event" onPress={()=>void add()}/></Card>}
- {upcoming.filter(e=>e.date.slice(0,10)>=new Date().toISOString().slice(0,10)).length===0&&<Card><Txt color={C.muted}>No upcoming events yet. Add interviews and deadlines to keep track.</Txt></Card>}
- {upcoming.filter(e=>e.date.slice(0,10)>=new Date().toISOString().slice(0,10)).map(e=><Pressable key={e.id} onLongPress={()=>Alert.alert('Delete event?',e.title,[{text:'Cancel'},{text:'Delete',style:'destructive',onPress:()=>void removeEvent(e.id)}])} style={{flexDirection:'row',gap:12,alignItems:'center',borderRadius:17,backgroundColor:C.white,padding:13,borderWidth:1,borderColor:C.line}}><View style={{width:45,alignItems:'center'}}><Txt size={10} color={C.blue}>{new Date(e.date).toLocaleDateString('en-US',{month:'short'}).toUpperCase()}</Txt><Txt size={23} bold>{new Date(e.date).getDate()}</Txt></View><View style={{flex:1}}><Txt bold>{e.title}</Txt><Txt color={C.muted} size={12}>{e.date.replace('T',' · ').slice(0,16)}</Txt><Txt color={C.muted} size={11}>{e.notes}</Txt></View><Icon name="calendar-outline" color={C.blue}/></Pressable>)}
- </ScrollView>;
+ const entering=reduce?MONTH_FADE:dir>0?MONTH_NEXT:dir<0?MONTH_PREV:MONTH_FADE;
+ return <LayoutAnimationConfig skipEntering><ScrollView contentContainerStyle={{padding:18,paddingBottom:125,gap:15}}><Heading>Calendar</Heading><Txt color={C.muted}>Stay on top of interviews, follow-ups, and deadlines.</Txt>
+ <Card style={{overflow:'hidden'}}>
+  <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+   <Tap accessibilityRole="button" accessibilityLabel="Previous month" onPress={()=>move(-1)} style={{width:44,height:44,alignItems:'center',justifyContent:'center'}}><Icon name="chevron-back" color={C.blue}/></Tap>
+   <View style={{alignItems:'center',gap:4}}><View accessible accessibilityRole="header"><Txt bold>{monthLabel}</Txt></View>{!isThisMonth&&<Tap accessibilityRole="button" onPress={goToday} hitSlop={10} style={{paddingHorizontal:10,paddingVertical:3,borderRadius:10,backgroundColor:C.pale}}><Txt size={11} bold color={C.blue}>Today</Txt></Tap>}</View>
+   <Tap accessibilityRole="button" accessibilityLabel="Next month" onPress={()=>move(1)} style={{width:44,height:44,alignItems:'center',justifyContent:'center'}}><Icon name="chevron-forward" color={C.blue}/></Tap>
+  </View>
+  <View style={{flexDirection:'row'}}>{['S','M','T','W','T','F','S'].map((d,i)=><View key={i} style={{width:'14.285%',alignItems:'center',paddingVertical:6}}><Txt size={11} color={C.muted}>{d}</Txt></View>)}</View>
+  <GestureDetector gesture={swipe}>
+  <Reanimated.View key={`${year}-${month}`} entering={entering} style={{flexDirection:'row',flexWrap:'wrap'}}>
+  {cells.map((n,i)=>{const key=`${year}-${pad(month+1)}-${pad(n)}`,on=n===day,isToday=key===todayKey;
+   return <Tap disabled={!n} accessibilityRole="button" accessibilityLabel={n?`${monthLabel.split(' ')[0]} ${n}${marked.has(key)?', has events':''}`:undefined} accessibilityState={{selected:on}} onPress={()=>n&&setDay(n)} key={i} style={{width:'14.285%',height:42,alignItems:'center',justifyContent:'center'}}>
+    <View style={{height:34,width:34,backgroundColor:on?C.blue:'transparent',borderRadius:17,justifyContent:'center',alignItems:'center'}}>
+     <Txt color={on?C.white:isToday?C.blue:n?C.ink:C.soft} bold={on||isToday} size={13}>{n||''}</Txt>
+     {n>0&&marked.has(key)&&<View style={{position:'absolute',bottom:4,backgroundColor:on?C.white:C.blue,width:4,height:4,borderRadius:2}}/>}
+    </View></Tap>;})}
+  </Reanimated.View>
+  </GestureDetector>
+ </Card>
+ <SectionTitle right={adding?'Cancel':'Add event'} onRight={()=>setAdding(!adding)}>Upcoming events</SectionTitle>
+ {adding&&<Reanimated.View entering={ROW_IN} exiting={ROW_OUT}><Card><Txt bold>New event · {selected}</Txt><Field label="Event" value={title} onChangeText={setTitle} placeholder="Interview with..."/><Field label="Time (24h HH:MM)" value={time} onChangeText={setTime}/><Field label="Notes" value={notes} onChangeText={setNotes}/><Primary label="Save event" onPress={()=>void add()}/></Card></Reanimated.View>}
+ {!adding&&upcoming.length===0&&<EmptyState card compact title="Nothing scheduled" body="Add interviews, follow-ups and deadlines so nothing sneaks up on you." action={{label:'Add event',onPress:()=>setAdding(true)}}/>}
+ {upcoming.map(e=><Reanimated.View key={e.id} layout={LIST_REFLOW} entering={ROW_IN} exiting={ROW_OUT}><Tap accessibilityRole="button" accessibilityHint="Long press to delete" onLongPress={()=>Alert.alert('Delete event?',e.title,[{text:'Cancel',style:'cancel'},{text:'Delete',style:'destructive',onPress:()=>void removeEvent(e.id)}])} style={{flexDirection:'row',gap:12,alignItems:'center',borderRadius:17,backgroundColor:C.white,padding:13,borderWidth:1,borderColor:C.line}}><View style={{width:45,alignItems:'center'}}><Txt size={10} color={C.blue}>{new Date(e.date).toLocaleDateString('en-US',{month:'short'}).toUpperCase()}</Txt><Txt size={23} bold>{new Date(e.date).getDate()}</Txt></View><View style={{flex:1}}><Txt bold>{e.title}</Txt><Txt color={C.muted} size={12}>{e.date.replace('T',' · ').slice(0,16)}</Txt>{!!e.notes&&<Txt color={C.muted} size={11}>{e.notes}</Txt>}</View><Icon name="calendar-outline" color={C.blue}/></Tap></Reanimated.View>)}
+ </ScrollView></LayoutAnimationConfig>;
 }

@@ -12,6 +12,9 @@ React Native 0.86 via Expo SDK 57; TypeScript strict mode; real-device **develop
 - `src/lib/imports.ts`: native image picking, OCR, resume document picking, model copy.
 - `src/lib/ai.ts`: single local model loader, completion endpoint, persona-specific system prompts, model error propagation.
 
+## Motion & input
+`react-native-reanimated` 4 + `react-native-worklets` (UI-thread animation), `react-native-gesture-handler` (UI-thread gestures; `GestureHandlerRootView` at the root and inside each `Modal`), `react-native-keyboard-controller` (`KeyboardProvider` at the root; composers use its `KeyboardAvoidingView`). The worklets Babel plugin is added by `babel-preset-expo`. Tokens live in `src/theme/motion.ts`. Core `Animated` remains only for native-driver ambient loops (cloud, typing dots, skeleton, mascot reactions).
+
 ## Data boundary & schema
 **SQLite persisted:** applications (id, company, title, status, description, etc), calendar events, message threads and profile info (experience, skills, resume URI, extracted text), imported GGUF URI.
 
@@ -33,6 +36,9 @@ DocumentPicker -> file copied into private app documents -> locally extract nati
 
 ## Real job discovery
 Jobicy endpoint `https://jobicy.com/api/v2/remote-jobs?count=40&tag=...`. No API key but last-7-day remote-job scope and rate limits. Keep canonical source URL. Filter by eligible location using provider data when needed; don't fabricate geography, employer logo, salary, or "verified" status. Later add licensed Philippines provider as separate adapter.
+
+## Exchange rates
+Salary display can convert provider salaries (structured `pay`: min, max, currency, period) into the user's chosen currency (Settings, default PHP; "As listed" turns it off). Rates are ECB reference rates from `https://api.frankfurter.dev/v1/latest?base=EUR` (no key). The request carries no user data; results are cached in SQLite (`fxRates`) and refreshed when older than 12 h, so conversion works offline with the last rates. Converted values are prefixed "≈"; manual salaries are shown as typed.
 
 ## Security / offline
 - Airplane mode must not block SQLite, imported OCR photos, current profile and local chat/mock (once model installed).

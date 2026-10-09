@@ -11,15 +11,15 @@ Requires **Node 22.13+** and Android Studio/Android device, or macOS/Xcode for i
 ```bash
 unzip brief-local-ai-starter.zip
 cd brief-starter
-bash scripts/install-agent-skills.sh    # requires internet, installs selected Codex agent skills
+bash scripts/install-agent-skills.sh    # requires internet, installs selected Claude Code skills
 bash scripts/setup.sh                   # requires internet, installs Expo and native libraries
-npm run android                        # on Android SDK host with device/emulator
+npx eas-cli@latest build --profile development --platform android   # cloud dev build (no local SDK); or npm run android with Android Studio
 # or npm run ios                       # on macOS with Xcode
 ```
 
 Open **Settings → Import GGUF model** to select an already downloaded compatible small Q4 GGUF file from your phone. Then **Test local model**. No model = explicit warning for AI actions, not hidden internet inference. Both `llama.rn` and `expo-ocr-kit` require a **development build, not Expo Go**.
 
-**Start your coding agent:** open `prompts/INITIAL_CODEX_PROMPT.md`, paste its contents into Codex with this directory as working directory. It forces a full documentation read, skill verification/install, implementation verification, and quality gates.
+**Start your coding agent:** open `prompts/INITIAL_PROMPT.md`, paste its contents into Claude Code with this directory as working directory. It forces a full documentation read, skill verification/install, implementation verification, and quality gates.
 
 ## Layout
 

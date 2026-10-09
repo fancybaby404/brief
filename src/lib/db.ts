@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import type { Application, Event, Message, Profile } from '../types';
+import { normalizeApplication } from './tracker';
 let db: SQLite.SQLiteDatabase;
 export async function initializeDb() {
   db = await SQLite.openDatabaseAsync('brief.db');
@@ -14,7 +15,7 @@ async function getRows<T>(table: 'applications'|'events'|'messages') {
   const rows = await instance().getAllAsync<{payload:string}>(`SELECT payload FROM ${table} ORDER BY rowid DESC`);
   return rows.map(r=>JSON.parse(r.payload) as T);
 }
-export const listApplications = () => getRows<Application>('applications');
+export const listApplications = async () => (await getRows<Application>('applications')).map(normalizeApplication);
 export const listEvents = () => getRows<Event>('events');
 export const listMessages = async (thread: string) => (await getRows<Message>('messages')).filter(m=>m.thread===thread).reverse();
 export async function saveApplication(a: Application) {

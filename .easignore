@@ -1,0 +1,21 @@
+# EAS Build upload. Replaces .gitignore for EAS, so the .gitignore entries are repeated here.
+node_modules/
+.expo/
+android/
+ios/
+*.log
+.env
+*.gguf
+.DS_Store
+*.keystore
+
+# Not needed to build the app. Agent skills are Windows junctions EAS can't copy;
+# design references are ~40 MB of PNGs.
+.claude/
+.agents/
+skills-lock.json
+design/
+docs/
+prompts/
+tests/
+scripts/

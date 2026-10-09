@@ -1,6 +1,6 @@
 # Acceptance and quality gates
 
-These are **not** claimed as passed. Codex must mark each result PASS/FAIL with evidence before asserting app completion.
+These are **not** claimed as passed. The agent must mark each result PASS/FAIL with evidence before asserting app completion.
 
 ## Build and engineering
 - `bash scripts/setup.sh`; install exact Expo-compatible native versions, no ignored install errors.
@@ -33,7 +33,7 @@ These are **not** claimed as passed. Codex must mark each result PASS/FAIL with 
 
 ## Specific demo flow for judges (3 minutes)
 1. Home → show progress from actual saved applications, open See all and sort.
-2. Add Job → screenshot of real posting → local OCR → AI field extraction → review → Saved; status = NOT APPLIED.
+2. Add Job → screenshot of real posting → local OCR → AI field extraction → review → Interested; status = NOT APPLIED.
 3. Switch airplane mode, open saved job, ask red flags; AI references its job description on-device.
 4. Mock → select same application → local interview with follow-up → finish with feedback, optional resume skill alignment.
 5. Resume profile through top-right profile menu, open visual preview, show locally saved content and ability to edit.
