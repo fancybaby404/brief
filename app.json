@@ -6,7 +6,6 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.brief.localai"
@@ -29,10 +28,11 @@
         {
           "enableEntitlements": true,
           "forceCxx20": true,
-          "enableOpenCL": false
+          "enableOpenCLAndHexagon": false
         }
       ],
-      "expo-build-properties"
+      "expo-build-properties",
+      "expo-font"
     ],
     "experiments": {
       "reactCompiler": false

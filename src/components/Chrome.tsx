@@ -2,7 +2,7 @@ import React from 'react';
 import {Pressable,View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {C} from '../theme/tokens';
-import {Brand,Icon,Txt} from './Ui';
+import {Brand,Icon,Txt,useKeyboardVisible} from './Ui';
 import {useBrief} from '../lib/appContext';
 export function Header({plain=false,title}:{plain?:boolean,title?:string}) {
  const {back,toggleProfileMenu,go}=useBrief();
@@ -19,7 +19,7 @@ const destinations: {key:'home'|'jobs'|'calendar'|'mock';label:string;icon:strin
  {key:'mock',label:'Mock',icon:'mic-outline',selected:'mic'}
 ];
 export function FloatingNav() {
- const {tab,goTab,toggleQuick,quick}=useBrief(); const insets=useSafeAreaInsets();
+ const {tab,goTab,toggleQuick,quick}=useBrief(); const insets=useSafeAreaInsets(); if(useKeyboardVisible())return null;
  return <View style={{position:'absolute',left:13,right:13,bottom:Math.max(insets.bottom,10),flexDirection:'row',gap:8,alignItems:'flex-end'}}>
  <View style={{flex:1,backgroundColor:C.white,borderRadius:26,minHeight:62,flexDirection:'row',alignItems:'center',justifyContent:'space-around',paddingHorizontal:5,borderWidth:1,borderColor:C.line,shadowColor:'#6686A9',shadowOpacity:0.10,shadowRadius:17,elevation:6}}>
  {destinations.map(d=><Pressable key={d.key} accessibilityRole="tab" accessibilityState={{selected:tab===d.key}} onPress={()=>goTab(d.key)} style={{alignItems:'center',justifyContent:'center',paddingHorizontal:5,minWidth:49,minHeight:55,gap:1}}><Icon name={tab===d.key?d.selected:d.icon} size={21} color={tab===d.key?C.blue:C.muted}/><Txt size={10} color={tab===d.key?C.blue:C.muted} bold={tab===d.key}>{d.label}</Txt></Pressable>)}

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Image, Pressable, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
+import React,{useEffect,useState} from 'react';
+import { Image, Keyboard, Pressable, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { C,R } from '../theme/tokens';
 export function Icon({name,size=20,color=C.ink}:{name:string,size?:number,color?:string}) {return <Ionicons name={name as any} size={size} color={color}/>;}
@@ -14,3 +14,5 @@ export function Mascot({size=125}:{size?:number}) {return <Image source={require
 export function Brand({onPress}:{onPress?:()=>void}) {return <Pressable onPress={onPress} style={{flexDirection:'row',alignItems:'center',gap:2}}><Txt bold size={29} color="#050505" style={{letterSpacing:-2}}>brief</Txt><Mascot size={32}/></Pressable>}
 export function StatusPill({status}:{status:string}) { const label:{[k:string]:string}={saved:'Saved',interested:'Interested',applied:'Applied',interview:'Interview',under_review:'Under review',offer:'Offer',rejected:'Rejected'};const green=['applied','offer'].includes(status); return <View style={{paddingHorizontal:10,paddingVertical:5,borderRadius:20,backgroundColor:green?C.greenSoft:status==='rejected'?C.redSoft:C.pale}}><Txt size={11} color={green?C.green:status==='rejected'?C.danger:C.blue}>{label[status]||status}</Txt></View>}
 export function SectionTitle({children,right,onRight}:{children:string,right?:string,onRight?:()=>void}) {return <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:9}}><Txt size={17} bold>{children}</Txt>{right&&<Pressable onPress={onRight}><Txt size={13} color={C.blue}>{right}</Txt></Pressable>}</View>}
+/** True while the software keyboard is up; the floating bar hides so it never covers a composer. */
+export function useKeyboardVisible() {const [v,setV]=useState(false);useEffect(()=>{const a=Keyboard.addListener('keyboardDidShow',()=>setV(true)),b=Keyboard.addListener('keyboardDidHide',()=>setV(false));return ()=>{a.remove();b.remove();};},[]);return v;}

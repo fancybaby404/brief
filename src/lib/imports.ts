@@ -18,7 +18,7 @@ export async function pickResume():Promise<string|null> {
   const src=res.assets[0].uri;const ext=res.assets[0].name?.toLowerCase().endsWith('.docx')?'docx':'pdf';
   if(!FileSystem.documentDirectory) throw new Error('Private document storage is unavailable');
   const dest=FileSystem.documentDirectory+'resume.'+ext;
-  await FileSystem.copyAsync({from:src,to:dest});return dest;
+  await FileSystem.deleteAsync(dest,{idempotent:true});await FileSystem.moveAsync({from:src,to:dest});return dest;
 }
 export async function pickModel():Promise<string|null> {
   const res=await DocumentPicker.getDocumentAsync({type:'*/*',copyToCacheDirectory:true});
@@ -26,7 +26,8 @@ export async function pickModel():Promise<string|null> {
   if(!res.assets[0].name.toLowerCase().endsWith('.gguf'))throw new Error('Please select a .gguf model file.');
   if(!FileSystem.documentDirectory) throw new Error('Private document storage is unavailable');
   const dest=FileSystem.documentDirectory+'brief-model.gguf';
-  await FileSystem.copyAsync({from:res.assets[0].uri,to:dest});return dest;
+  // Move, not copy: the picker already cached a private copy, and models are ~1 GB.
+  await FileSystem.deleteAsync(dest,{idempotent:true});await FileSystem.moveAsync({from:res.assets[0].uri,to:dest});return dest;
 }
 
 export async function readResumeText(uri:string):Promise<string> {
@@ -35,3 +36,4 @@ export async function readResumeText(uri:string):Promise<string> {
  if(!isAvailable()) throw new Error('Resume extraction requires a native development build.');
  return (await extractText(uri)).slice(0,14000);
 }
+export async function deleteLocalFile(uri:string) { if(uri) await FileSystem.deleteAsync(uri,{idempotent:true}); }
