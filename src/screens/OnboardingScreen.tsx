@@ -1,0 +1,11 @@
+import React,{useState} from 'react';
+import {Alert,Pressable,ScrollView,View} from 'react-native';import {useBrief} from '../lib/appContext';
+import {C} from '../theme/tokens';import {Field,Heading,Mascot,Primary,Txt} from '../components/Ui';import {pickResume,readResumeText} from '../lib/imports';
+export function OnboardingScreen(){const {profile,updateProfile,finishOnboarding}=useBrief();const [name,setName]=useState(''),[experience,setExperience]=useState(''),[skills,setSkills]=useState(''),[step,setStep]=useState(0);
+ async function skip(){await updateProfile({...profile,name:name.trim()||'job hunter',experience,skills});await finishOnboarding();}
+ async function upload(){try{const uri=await pickResume();if(!uri)return;let resumeText='';if(uri.endsWith('.pdf'))try{resumeText=await readResumeText(uri);}catch{}await updateProfile({...profile,name:name.trim()||'job hunter',experience,skills,resumeUri:uri,useResumeForAI:true,resumeText});await finishOnboarding();}catch(e){Alert.alert('Could not attach resume',String(e));}}
+ return <ScrollView contentContainerStyle={{flexGrow:1,padding:22,paddingTop:45,gap:15,justifyContent:'center'}}>
+ <View style={{alignSelf:'center',padding:24,backgroundColor:C.pale,borderRadius:65}}><Mascot size={137}/></View>
+ {step===0?<><Heading>Welcome to brief.</Heading><Txt color={C.muted} size={16}>Save job opportunities, keep applications organized, and practice interviews with AI that runs on your phone.</Txt><Primary label="Get started" onPress={()=>setStep(1)}/><Primary label="Skip setup" secondary onPress={()=>void skip()}/></>:<><Heading>Make Brief yours.</Heading><Txt color={C.muted}>Your resume is optional. Add it now, enter a few details, or start tracking immediately.</Txt><Field label="What should we call you?" value={name} onChangeText={setName} placeholder="First name"/><Field label="Skills (optional)" value={skills} onChangeText={setSkills} placeholder="Design, React, customer support..."/><Field label="Experience (optional)" value={experience} onChangeText={setExperience} multiline/><Primary label="Attach resume & continue" onPress={()=>void upload()}/><Primary secondary label="Continue without resume" onPress={()=>void skip()}/></>}
+ </ScrollView>;
+}

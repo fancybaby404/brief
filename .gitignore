@@ -1,0 +1,9 @@
+node_modules/
+.expo/
+android/
+ios/
+*.log
+.env
+*.gguf
+.DS_Store
+*.keystore

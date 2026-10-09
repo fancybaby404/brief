@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "brief",
+    "slug": "brief-local-ai",
+    "scheme": "brief",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.brief.localai"
+    },
+    "android": {
+      "package": "com.brief.localai",
+      "permissions": [
+        "CAMERA"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#E8F5FF"
+      }
+    },
+    "plugins": [
+      "expo-document-picker",
+      "expo-image-picker",
+      [
+        "llama.rn",
+        {
+          "enableEntitlements": true,
+          "forceCxx20": true,
+          "enableOpenCL": false
+        }
+      ],
+      "expo-build-properties"
+    ],
+    "experiments": {
+      "reactCompiler": false
+    },
+    "icon": "./assets/icon.png"
+  }
+}

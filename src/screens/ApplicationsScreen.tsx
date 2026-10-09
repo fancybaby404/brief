@@ -1,0 +1,12 @@
+import React,{useMemo,useState} from 'react';
+import {Pressable,ScrollView,TextInput,View} from 'react-native';
+import {useBrief} from '../lib/appContext';
+import {Heading,Icon,StatusPill,Txt} from '../components/Ui';import {C} from '../theme/tokens';
+export function ApplicationsScreen(){const {applications,openApp}=useBrief();const [q,setQ]=useState('');const [sort,setSort]=useState<'newest'|'oldest'|'company'|'status'>('newest');
+ const filtered=useMemo(()=>applications.filter(a=>(a.company+' '+a.title).toLowerCase().includes(q.toLowerCase())).sort((a,b)=>sort==='company'?a.company.localeCompare(b.company):sort==='status'?a.status.localeCompare(b.status):sort==='oldest'?a.createdAt.localeCompare(b.createdAt):b.createdAt.localeCompare(a.createdAt)),[applications,q,sort]);
+ function nextSort(){setSort(v=>({newest:'oldest',oldest:'company',company:'status',status:'newest'} as const)[v]);}
+ return <ScrollView contentContainerStyle={{padding:18,paddingBottom:120,gap:13}}><Heading>Applications</Heading>
+ <View style={{flexDirection:'row',gap:8}}><View style={{backgroundColor:C.pale2,borderRadius:25,flex:1,flexDirection:'row',alignItems:'center',paddingHorizontal:12}}><Icon name="search" size={18} color={C.muted}/><TextInput accessibilityLabel="Search applications" style={{padding:11,flex:1,color:C.ink}} placeholder="Search applications..." placeholderTextColor={C.soft} value={q} onChangeText={setQ}/></View><Pressable onPress={nextSort} style={{paddingHorizontal:13,backgroundColor:C.white,borderRadius:23,borderWidth:1,borderColor:C.line,justifyContent:'center',flexDirection:'row',gap:6,alignItems:'center'}}><Icon name="options-outline" size={17} color={C.blue}/><Txt size={12} color={C.blue}>Sort: {sort}</Txt></Pressable></View>
+ {filtered.length?filtered.map(a=><Pressable key={a.id} onPress={()=>openApp(a)} style={{backgroundColor:C.white,borderRadius:17,padding:13,flexDirection:'row',alignItems:'center',gap:11,borderColor:C.line,borderWidth:1}}><View style={{width:42,height:42,backgroundColor:C.pale2,borderRadius:11,alignItems:'center',justifyContent:'center'}}><Icon name="briefcase-outline" color={C.blue}/></View><View style={{flex:1}}><Txt bold>{a.company}</Txt><Txt color={C.muted} size={12}>{a.title}</Txt><Txt color={C.soft} size={10}>{a.createdAt.slice(0,10)}</Txt></View><StatusPill status={a.status}/><Icon name="chevron-forward" color={C.soft} size={14}/></Pressable>):<Txt color={C.muted}>No matching applications. Tap + to add one.</Txt>}
+ </ScrollView>;
+}

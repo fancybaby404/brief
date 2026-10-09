@@ -1,0 +1,210 @@
+{
+  "image_count": 41,
+  "images": [
+    {
+      "path": "current/01-applications-profile-resume-quick-actions.png",
+      "bytes": 1849565,
+      "sha256": "f1eccf6965029f6c120dbf9eb71dd5d2c6ce086eb4f2240af32c511d044eb1e4"
+    },
+    {
+      "path": "current/02-mock-calendar-job-detail.png",
+      "bytes": 1350209,
+      "sha256": "2242e73fab93757a4f92406da51fe6cb1b094c1cecc644b61bc8d0942dfebcd0"
+    },
+    {
+      "path": "current/03-home-jobs-chat.png",
+      "bytes": 1386403,
+      "sha256": "96cb54f3dc197ea5ce32f3fd790634ece51249f70178f89388c4c00a2df1cc14"
+    },
+    {
+      "path": "current/04-mascot-source.png",
+      "bytes": 36588,
+      "sha256": "9313d87e3c2c7da1f9b401aba15232bb04b594ee437a8b6a9ef16a4f8b72bb25"
+    },
+    {
+      "path": "history/a_clean_product_ui_presentation_image_four_iphone.png",
+      "bytes": 1622758,
+      "sha256": "35885c3a4b4ee225cdf201c7fb37622c3d3a2f333c32e4d4c54fa908a4bb2dd7"
+    },
+    {
+      "path": "history/a_clean_product_ui_showcase_on_a_white_background.png",
+      "bytes": 1329749,
+      "sha256": "c601b18d37a669fd98a4a77a638363172e835b995bc5682ba719deacf730a814"
+    },
+    {
+      "path": "history/account-popover-study.png",
+      "bytes": 283404,
+      "sha256": "b008b251ac1a2e3f1e083e0bf538f637f29fb4a18889bd74a8bb221305af6598"
+    },
+    {
+      "path": "history/brief-logo-and-mascot.png",
+      "bytes": 121807,
+      "sha256": "80506c7dc09f560e8d3fa583615b3b8291a0f91f4a2aaef0ed917305e290d759"
+    },
+    {
+      "path": "history/brief_a_modern_job_search_app_showcase.png",
+      "bytes": 1568350,
+      "sha256": "a23a67a7237ac91f8bdbd4595e2a818a91f2314a1ac11526cdcb508438a21829"
+    },
+    {
+      "path": "history/brief_app_four_screen_ios_job_search_showcase.png",
+      "bytes": 1692174,
+      "sha256": "ddecd7449eddd57649141e637b59e1955bb8a9a14765788bc067ca3259145662"
+    },
+    {
+      "path": "history/brief_app_four_screen_ios_showcase.png",
+      "bytes": 1521495,
+      "sha256": "3b44eac3a4c6acd71d62299c0d22ea71f180aedcf042a1015215dbaaf4462a82"
+    },
+    {
+      "path": "history/brief_app_four_screen_job_search_showcase.png",
+      "bytes": 1717839,
+      "sha256": "4a5f5eb49aeff06b8931fdc104165b086aeefb1e658cc34648d22c86d9c69a77"
+    },
+    {
+      "path": "history/brief_app_iphone_ui_showcase.png",
+      "bytes": 1495635,
+      "sha256": "50f323aafee6547def4d5937e15f0a884f0c57b722c8e6fae9eb202308a60bd7"
+    },
+    {
+      "path": "history/brief_job_search_app_mockup.png",
+      "bytes": 1664791,
+      "sha256": "fca23c7ea8422ff4fb4fd8a8108f3109eb0b07619fbaa92afac918d86e762ae3"
+    },
+    {
+      "path": "history/brief_job_tracker_app_showcase.png",
+      "bytes": 1628679,
+      "sha256": "37894627f7e09afbac18fdd44feec4bd17e343e45e1b96431b0d2b07ebaee48b"
+    },
+    {
+      "path": "history/brief_your_ai_job_search_companion.png",
+      "bytes": 1632985,
+      "sha256": "c15274f72cf21fb712d7fc6ac49fea3b3334f4972b5a87aec64748f485b7c6b4"
+    },
+    {
+      "path": "history/floating-bar-study.png",
+      "bytes": 119123,
+      "sha256": "c45aef2b1d83f1c34bb36b79f9350a888de24f902718f1826ebc96169df96ddd"
+    },
+    {
+      "path": "history/image(20261009-071825).png",
+      "bytes": 388160,
+      "sha256": "a8476035799f33e04dbcb4b6435af7839c258ef3c5d86c699acb4a904edc7327"
+    },
+    {
+      "path": "history/image(20261009-072529).png",
+      "bytes": 28832,
+      "sha256": "3cbebec869b358e1626deca792b432cfc4aaae7ad10489a449fa7a71d33928a7"
+    },
+    {
+      "path": "history/image(20261009-073535).png",
+      "bytes": 121807,
+      "sha256": "80506c7dc09f560e8d3fa583615b3b8291a0f91f4a2aaef0ed917305e290d759"
+    },
+    {
+      "path": "history/image(20261009-074426).png",
+      "bytes": 119123,
+      "sha256": "c45aef2b1d83f1c34bb36b79f9350a888de24f902718f1826ebc96169df96ddd"
+    },
+    {
+      "path": "history/image(20261009-074702).png",
+      "bytes": 1339164,
+      "sha256": "c19c436e3af0c799ae35e96e141e07dee1668134758f912e3791d90d12a99c8f"
+    },
+    {
+      "path": "history/image(20261009-075021).png",
+      "bytes": 211812,
+      "sha256": "075961d9964cfc68fd32b21bb2d7529774bfbe4601aa5076057c02ca8d5f12fd"
+    },
+    {
+      "path": "history/image(20261009-080442).png",
+      "bytes": 133013,
+      "sha256": "55ef8c906ff1c1ffd23402b2678401f5c9fe4bddd8575395edc5353660d6714a"
+    },
+    {
+      "path": "history/image(20261009-080946).png",
+      "bytes": 319049,
+      "sha256": "cb103fb13953f45378b6cb237c3cd22bb36688925b14e25da27b748294785566"
+    },
+    {
+      "path": "history/image(20261009-081949).png",
+      "bytes": 335159,
+      "sha256": "8536d622941e8f388f38f826ef39d95e3e157b9c7ba8f14aeba3133e7410ffaa"
+    },
+    {
+      "path": "history/image(20261009-084752).png",
+      "bytes": 221262,
+      "sha256": "c7822c72e6354afc2fd347a114048b41eb42c9678fb44d837d87772d5e4147c4"
+    },
+    {
+      "path": "history/image(20261009-090856).png",
+      "bytes": 211270,
+      "sha256": "3098694e232f229e47a0eddac2eced4975682171bac62aaf5451a0f22709e4af"
+    },
+    {
+      "path": "history/image(20261009-091358).png",
+      "bytes": 283404,
+      "sha256": "b008b251ac1a2e3f1e083e0bf538f637f29fb4a18889bd74a8bb221305af6598"
+    },
+    {
+      "path": "history/image(20261009-091639).png",
+      "bytes": 1926427,
+      "sha256": "67b5974c30c9240cc53b0f4659b63eef7985128471b30532e2cc0e5e7ae71736"
+    },
+    {
+      "path": "history/image(20261009-092035).png",
+      "bytes": 37169,
+      "sha256": "a31ad9fc07dfdce464e5b23d3a07f0da161a5a8305753503d351070b674b4e16"
+    },
+    {
+      "path": "history/image(20261009-093022).png",
+      "bytes": 54854,
+      "sha256": "6220abeda5f1099c9ff120b41b463a82dca34f5adf0b49fcf8402d54c5b0d31f"
+    },
+    {
+      "path": "history/image(20261009-093742).png",
+      "bytes": 2050550,
+      "sha256": "1db7012c8bdbe9a479bdc0d6f80506759875b59ff01187c652229ae81e097dce"
+    },
+    {
+      "path": "history/image(20261009-095304).png",
+      "bytes": 1849565,
+      "sha256": "f1eccf6965029f6c120dbf9eb71dd5d2c6ce086eb4f2240af32c511d044eb1e4"
+    },
+    {
+      "path": "history/image(20261009-095315).png",
+      "bytes": 1350209,
+      "sha256": "2242e73fab93757a4f92406da51fe6cb1b094c1cecc644b61bc8d0942dfebcd0"
+    },
+    {
+      "path": "history/image(20261009-095329).png",
+      "bytes": 1386403,
+      "sha256": "96cb54f3dc197ea5ce32f3fd790634ece51249f70178f89388c4c00a2df1cc14"
+    },
+    {
+      "path": "history/image-markup-preview-file_00000000056c820b8225445691add0a1.png",
+      "bytes": 1624925,
+      "sha256": "712c1a4ea771a00658cd3f338f075a755158fcf1b3d7c3fe9d36fe7b0e7934db"
+    },
+    {
+      "path": "history/later-product-polish.png",
+      "bytes": 2050550,
+      "sha256": "1db7012c8bdbe9a479bdc0d6f80506759875b59ff01187c652229ae81e097dce"
+    },
+    {
+      "path": "history/latest-mock-states.png",
+      "bytes": 1350209,
+      "sha256": "2242e73fab93757a4f92406da51fe6cb1b094c1cecc644b61bc8d0942dfebcd0"
+    },
+    {
+      "path": "history/soft_green_career_app_showcase.png",
+      "bytes": 1662975,
+      "sha256": "6e7acee30f11196b34bc5827c325045b6ebfdf4e39fc8b18e55c0f92ca8b50d6"
+    },
+    {
+      "path": "history/user-mock-flow.png",
+      "bytes": 221262,
+      "sha256": "c7822c72e6354afc2fd347a114048b41eb42c9678fb44d837d87772d5e4147c4"
+    }
+  ]
+}
