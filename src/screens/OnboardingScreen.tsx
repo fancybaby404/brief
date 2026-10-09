@@ -7,9 +7,12 @@ import {useBrief} from '../lib/appContext';
 import {C} from '../theme/tokens';
 import {CloudHalo,CompanyLogo,Icon,Mascot,Primary,Sparkles,Tap,Txt,Wordmark,useReducedMotion} from '../components/Ui';
 import {LiveMascot} from '../components/LiveMascot';
-import {TypingDots} from '../components/States';
+import {ModelSetupOverlay,TypingDots,type ModelSetupStage} from '../components/States';
 import {hasProfileDetails,listItems} from '../lib/profile';
 import type {Profile} from '../types';
+import {MODEL_CATALOG,type CatalogModel} from '../lib/modelCatalog';
+import {downloadCatalogBundle,deleteLocalFile,pickModel} from '../lib/imports';
+import {benchmarkModel,configureModel,modelPath,visionProjectorPath,supportsVision} from '../lib/ai';
 
 const PAGES=4;
 const shadow={shadowColor:'#33446A',shadowOpacity:0.1,shadowRadius:18,shadowOffset:{width:0,height:8},elevation:4} as const;
@@ -116,14 +119,45 @@ export function OnboardingScreen(){
  const {width}=useWindowDimensions();const insets=useSafeAreaInsets();const reduce=useReducedMotion();
  const pager=useAnimatedRef<Reanimated.ScrollView>();const x=useSharedValue(0);
  const onScroll=useAnimatedScrollHandler(e=>{x.set(e.contentOffset.x);});
- const [index,setIndex]=useState(0);
- const goTo=(i:number)=>{setIndex(i);pager.current?.scrollTo({x:i*width,animated:!reduce});};
- useEffect(()=>{const s=BackHandler.addEventListener('hardwareBackPress',()=>{if(index>0){goTo(index-1);return true;}return false;});return ()=>s.remove();},[index,width]);
+ const [index,setIndex]=useState(0),[setupStage,setSetupStage]=useState<ModelSetupStage|null>(null),[modelProgress,setModelProgress]=useState<number|null>(null),[installedModel,setInstalledModel]=useState(''),[setupMessage,setSetupMessage]=useState(''),[setupError,setSetupError]=useState(false);
+ const downloadTask=useRef<import('expo-file-system/legacy').DownloadResumable|null>(null),cancelRequested=useRef(false);
+ const setupBusy=setupStage!==null;
+ useEffect(()=>{void modelPath().then(setInstalledModel);},[]);
+ const goTo=(i:number)=>{if(setupBusy)return;setIndex(i);pager.current?.scrollTo({x:i*width,animated:!reduce});};
+ useEffect(()=>{const s=BackHandler.addEventListener('hardwareBackPress',()=>{if(setupBusy)return true;if(index>0){goTo(index-1);return true;}return false;});return ()=>s.remove();},[index,width,setupBusy]);
+ async function installFromCatalog(entry:CatalogModel){
+  cancelRequested.current=false;setSetupMessage('');setSetupError(false);setModelProgress(0);setSetupStage('download-model');
+  let downloaded:{modelUri:string,projectorUri:string}|null=null;let previousModel='',previousProjector='';let switched=false;
+  try{
+   downloaded=await downloadCatalogBundle(entry,p=>setModelProgress(Math.round(p*100)),task=>{downloadTask.current=task;if(task&&cancelRequested.current)void task.cancelAsync();});
+   if(!downloaded){setSetupMessage('Download canceled. You can choose a model or continue without AI.');return;}
+   [previousModel,previousProjector]=await Promise.all([modelPath(),visionProjectorPath()]);
+   await configureModel(downloaded.modelUri,downloaded.projectorUri);switched=true;setInstalledModel(downloaded.modelUri);setSetupStage('load-model');setModelProgress(0);
+   await benchmarkModel(p=>setModelProgress(Math.max(0,Math.min(100,Math.round(p)))),()=>{setSetupStage('check-model');setModelProgress(null);});
+   if(!await supportsVision())throw new Error('Image support did not initialize. Your previous model is restored.');
+   if(previousModel&&previousModel!==downloaded.modelUri)await deleteLocalFile(previousModel).catch(()=>{});
+   if(previousProjector&&previousProjector!==downloaded.projectorUri)await deleteLocalFile(previousProjector).catch(()=>{});
+   setSetupMessage(`${entry.name} is ready for text and images on this phone. Continue when you’re ready.`);
+  }catch(e){
+   if(switched){await configureModel(previousModel,previousProjector).catch(()=>{});setInstalledModel(previousModel);}
+   if(downloaded){await deleteLocalFile(downloaded.modelUri).catch(()=>{});await deleteLocalFile(downloaded.projectorUri).catch(()=>{});}
+   setSetupMessage(`Setup couldn’t finish. ${(e as Error).message}`);setSetupError(true);
+  }
+  finally{downloadTask.current=null;cancelRequested.current=false;setSetupStage(null);setModelProgress(null);}
+ }
+ async function importLocalModel(){
+  setSetupMessage('');setSetupError(false);setSetupStage('choose-model');
+  let imported='';
+  try{const uri=await pickModel();if(!uri)return;imported=uri;setSetupStage('import-model');const [oldModel,oldProjector]=await Promise.all([modelPath(),visionProjectorPath()]);await configureModel(uri);if(oldModel&&oldModel!==uri)await deleteLocalFile(oldModel).catch(()=>{});if(oldProjector)await deleteLocalFile(oldProjector).catch(()=>{});setInstalledModel(uri);setSetupMessage('Model added. Brief will test it when you continue in Settings.');}
+  catch(e){if(imported)await deleteLocalFile(imported).catch(()=>{});setSetupMessage(`Couldn’t add the model. ${(e as Error).message}`);setSetupError(true);}
+  finally{setSetupStage(null);}
+ }
+ function cancelModelDownload(){cancelRequested.current=true;void downloadTask.current?.cancelAsync();}
  const last=index===PAGES-1;
  const page=(i:number,content:React.ReactNode)=><ScrollView key={i} style={{width}} showsVerticalScrollIndicator={false} contentContainerStyle={{flexGrow:1,paddingHorizontal:24,paddingTop:16,paddingBottom:12,gap:16}}>{content}</ScrollView>;
 
  return <View style={{flex:1}}>
- <Reanimated.ScrollView ref={pager} horizontal pagingEnabled bounces={false} showsHorizontalScrollIndicator={false} scrollEventThrottle={16}
+ <Reanimated.ScrollView ref={pager} horizontal pagingEnabled scrollEnabled={!setupBusy} bounces={false} showsHorizontalScrollIndicator={false} scrollEventThrottle={16}
   onScroll={onScroll}
   onMomentumScrollEnd={e=>setIndex(Math.round(e.nativeEvent.contentOffset.x/width))}>
   {page(0,<View style={{flex:1,justifyContent:'center'}}><Parallax x={x} i={0} width={width}><Welcome/></Parallax></View>)}
@@ -150,15 +184,24 @@ export function OnboardingScreen(){
    <Rows rows={[
     {icon:'lock-closed-outline',title:'Runs on your device',sub:'Your data stays private'},
     {icon:'cloud-offline-outline',title:'No AI in the cloud',sub:'Chats and interviews stay on this phone'},
-    {icon:'shield-checkmark-outline',title:'Safe & secure',sub:'Practice with confidence'},
    ]}/>
-   <Txt size={12} color={C.muted} style={{textAlign:'center'}}>Add an on-device model in Settings when you’re ready. Job tracking works without it.</Txt>
+   <View style={{gap:9}}>
+    <Txt size={12} color={C.muted} style={{textAlign:'center'}}>Local AI is optional. Download a recommended model directly to this phone, or import a compatible GGUF you already have.</Txt>
+    {MODEL_CATALOG.map(entry=><View key={entry.id} style={{gap:8,borderRadius:15,borderWidth:1,borderColor:C.line,padding:12,backgroundColor:C.white}}>
+     <View style={{flexDirection:'row',alignItems:'flex-start',gap:8}}><View style={{flex:1,gap:3}}><Txt bold size={14}>{entry.name}</Txt><Txt size={12} color={C.muted}>{entry.description}</Txt><Txt size={11} color={C.muted}>{entry.sizeLabel} · Q4_K_M + Q8_0 vision encoder · {entry.license}</Txt></View><Icon name="cloud-download-outline" size={18} color={C.blue}/></View>
+     <Tap accessibilityRole="button" accessibilityLabel={`${installedModel?'Download and switch to':'Download'} ${entry.name}, ${entry.sizeLabel}`} onPress={()=>void installFromCatalog(entry)} style={{minHeight:42,flexDirection:'row',alignItems:'center',justifyContent:'center',borderRadius:12,backgroundColor:C.pale}}><Txt size={13} bold color={C.blue}>{installedModel?'Download & switch':'Download model'}</Txt></Tap>
+    </View>)}
+    <Tap accessibilityRole="button" onPress={()=>void importLocalModel()} style={{minHeight:44,alignItems:'center',justifyContent:'center'}}><Txt size={13} bold color={C.blue}>Import a model from this device instead</Txt></Tap>
+    {!!setupMessage&&<Txt size={12} color={setupError?C.danger:C.green} style={{textAlign:'center'}}>{setupMessage}</Txt>}
+    <Txt size={11} color={C.muted} style={{textAlign:'center'}}>Source: official Qwen GGUF files on Hugging Face. Downloads stay on this device; conversations never leave it.</Txt>
+   </View>
   </>)}
  </Reanimated.ScrollView>
  <View style={{paddingHorizontal:24,paddingTop:10,paddingBottom:Math.max(insets.bottom,12)+4,gap:12}}>
   <PageDots x={x} width={width} index={index}/>
-  <Primary large icon="chevron-forward" label={last?'Get started':'Continue'} onPress={()=>last?void finishOnboarding():goTo(index+1)}/>
-  <Tap accessibilityRole="button" onPress={()=>last?goTo(index-1):void finishOnboarding()} style={{alignSelf:'center',minHeight:44,minWidth:88,alignItems:'center',justifyContent:'center'}}><Txt size={15} color={C.muted}>{last?'Back':'Skip'}</Txt></Tap>
+  <Primary large disabled={setupBusy} icon="chevron-forward" label={last?'Get started':'Continue'} onPress={()=>last?void finishOnboarding():goTo(index+1)}/>
+  <Tap accessibilityRole="button" disabled={setupBusy} onPress={()=>last?goTo(index-1):void finishOnboarding()} style={{alignSelf:'center',minHeight:44,minWidth:88,alignItems:'center',justifyContent:'center'}}><Txt size={15} color={C.muted}>{last?'Back':'Skip'}</Txt></Tap>
  </View>
+ <ModelSetupOverlay stage={setupStage} progress={modelProgress} onCancel={setupStage==='download-model'?cancelModelDownload:undefined}/>
  </View>;
 }

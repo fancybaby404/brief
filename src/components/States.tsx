@@ -1,10 +1,13 @@
 // Shared empty / loading / error states. Every state says what happened, why, and offers the next step.
 import React,{useEffect,useRef,useState} from 'react';
-import {Animated,Easing,View} from 'react-native';
-import Reanimated,{FadeIn,FadeOut,withTiming,type EntryExitAnimationFunction} from 'react-native-reanimated';
-import {EASE_OUT,ROW_IN} from '../theme/motion';
+import {Animated,Easing,Image,Modal,View} from 'react-native';
+import {Image as ExpoImage} from 'expo-image';
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import Reanimated,{cancelAnimation,FadeIn,FadeOut,interpolate,useAnimatedStyle,useSharedValue,withRepeat,withSequence,withTiming,Easing as ReanimatedEasing,type EntryExitAnimationFunction} from 'react-native-reanimated';
+import {EASE_IN_OUT,EASE_OUT,ROW_IN} from '../theme/motion';
 import {C} from '../theme/tokens';
-import {Card,Icon,Mascot,Primary,Tap,Txt,useReducedMotion,type Mood} from './Ui';
+import {Card,Icon,Mascot,Primary,Tap,Txt,Wordmark,useReducedMotion,type Mood} from './Ui';
 import {LiveMascot} from './LiveMascot';
 import {modelPath} from '../lib/ai';
 
@@ -39,10 +42,14 @@ export function JobsSkeleton({count=4}:{count?:number}){const opacity=usePulse()
  </View>;
 }
 
+function ThinkingDot({phase,progress,reduced}:{phase:number,progress:{get:()=>number},reduced:boolean}){
+ const style=useAnimatedStyle(()=>{const p=(progress.get()+phase)%1,peak=p<0.5?p*2:(1-p)*2;return {opacity:reduced?0.75:interpolate(peak,[0,1],[0.3,1]),transform:[{translateY:reduced?0:interpolate(peak,[0,1],[0,-2])}]};});
+ return <Reanimated.View style={[{width:7,height:7,borderRadius:4,backgroundColor:C.blue},style]}/>;
+}
 export function TypingDots(){
- const reduce=useReducedMotion();const t=useRef(new Animated.Value(0)).current;
- useEffect(()=>{if(reduce)return;const loop=Animated.loop(Animated.timing(t,{toValue:1,duration:1300,easing:Easing.linear,useNativeDriver:true}));loop.start();return ()=>{loop.stop();t.setValue(0);};},[reduce]);
- return <View style={{flexDirection:'row',gap:6}}>{[0,1,2].map(i=><Animated.View key={i} style={{width:7,height:7,borderRadius:4,backgroundColor:C.blue,opacity:reduce?0.8:t.interpolate({inputRange:[0,0.15+i*0.15,0.4+i*0.15,1],outputRange:[0.3,1,0.3,0.3]})}}/>)}</View>;
+ const reduce=useReducedMotion();const progress=useSharedValue(0);
+ useEffect(()=>{if(reduce){progress.set(0);return;}progress.set(withRepeat(withTiming(1,{duration:1300,easing:ReanimatedEasing.linear}),-1,false));return()=>cancelAnimation(progress);},[progress,reduce]);
+ return <View style={{flexDirection:'row',gap:6}}>{[0,1,2].map(i=><ThinkingDot key={i} phase={i/3} progress={progress} reduced={reduce}/>)}</View>;
 }
 
 // A new message rises 10 px into place (it came from the composer below); history doesn't animate.
@@ -51,11 +58,11 @@ const MESSAGE_FADE=FadeIn.duration(150).easing(EASE_OUT);
 const THINK_IN=FadeIn.duration(150).easing(EASE_OUT),THINK_OUT=FadeOut.duration(120).easing(EASE_OUT);
 
 /** One chat / mock message. `animate` only for messages created while the screen is open. */
-export function MessageBubble({role,text,animate,avatar=31}:{role:'user'|'assistant',text:string,animate:boolean,avatar?:number}){
+export function MessageBubble({role,text,imageUri,animate,avatar=31}:{role:'user'|'assistant',text:string,imageUri?:string,animate:boolean,avatar?:number}){
  const reduce=useReducedMotion();const mine=role==='user';
  return <Reanimated.View entering={animate?(reduce?MESSAGE_FADE:MESSAGE_IN):undefined} style={{maxWidth:'88%',alignSelf:mine?'flex-end':'flex-start',flexDirection:'row',alignItems:'flex-end',gap:7}}>
  {!mine&&<Mascot size={avatar}/>}
- <View style={{backgroundColor:mine?C.blue:C.pale,padding:13,borderRadius:18,flexShrink:1}}><Txt selectable color={mine?C.white:C.ink}>{text}</Txt></View>
+ <View style={{backgroundColor:mine?C.blue:C.pale,padding:13,borderRadius:18,flexShrink:1,gap:imageUri&&text?8:0}}>{!!imageUri&&<Image source={{uri:imageUri}} accessibilityLabel="Attached image" resizeMode="cover" style={{width:190,height:130,borderRadius:11}}/>}{!!text&&<Txt selectable color={mine?C.white:C.ink}>{text}</Txt>}</View>
  </Reanimated.View>;
 }
 
@@ -89,4 +96,76 @@ export function ModelSetupCard({onOpenSettings,feature}:{onOpenSettings:()=>void
  </View>
  <Primary label="Open Settings" icon="chevron-forward" onPress={onOpenSettings}/>
  </Card>;
+}
+
+export type ModelSetupStage='choose-model'|'import-model'|'download-model'|'choose-projector'|'import-projector'|'load-model'|'check-model';
+const MODEL_SETUP_COPY:Record<ModelSetupStage,{title:string,body:string}>={
+ 'choose-model':{title:'Choose a local model',body:'Select a .gguf file saved on this device. It will stay private to Brief.'},
+ 'import-model':{title:'Adding your model',body:'Brief is preparing the model in private storage. Large files can take a little while.'},
+ 'download-model':{title:'Downloading local AI',body:'Brief is downloading the model and its matching image encoder directly to this phone.'},
+ 'choose-projector':{title:'Choose a vision projector',body:'Select the matching mmproj .gguf file to add image support.'},
+ 'import-projector':{title:'Adding image support',body:'Brief is preparing the vision projector on this device.'},
+ 'load-model':{title:'Waking Brief up',body:'Loading your local model for the first time can take a little while.'},
+ 'check-model':{title:'Checking your model',body:'Brief is running one short reply entirely on this device.'},
+};
+
+function ModelSetupMascot({downloadAnimation=false}:{downloadAnimation?:boolean}){
+ const reduce=useReducedMotion(),bob=useSharedValue(0),breath=useSharedValue(0);
+ useEffect(()=>{
+  if(reduce||downloadAnimation){bob.set(0);breath.set(0);return;}
+  const ease=EASE_IN_OUT;
+  bob.set(withRepeat(withSequence(withTiming(-4,{duration:850,easing:ease}),withTiming(0,{duration:850,easing:ease})),-1,false));
+  breath.set(withRepeat(withTiming(1,{duration:1700,easing:ReanimatedEasing.inOut(ReanimatedEasing.sin)}),-1,true));
+  return()=>{cancelAnimation(bob);cancelAnimation(breath);};
+ },[reduce,downloadAnimation]);
+ const haloStyle=useAnimatedStyle(()=>({opacity:interpolate(breath.get(),[0,1],[0.55,0.9]),transform:[{scale:interpolate(breath.get(),[0,1],[0.94,1.03])}]}));
+ const mascotStyle=useAnimatedStyle(()=>({transform:[{translateY:bob.get()}]}));
+ if(downloadAnimation)return <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{width:190,height:186,borderRadius:24,backgroundColor:C.white,overflow:'hidden'}}>
+  <ExpoImage source={require('../../assets/briefcase-paper-loop.gif')} contentFit="contain" autoplay={!reduce} style={{width:'100%',height:'100%'}}/>
+ </View>;
+ return <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{width:166,height:150,alignItems:'center',justifyContent:'center'}}>
+  <Reanimated.View style={[{position:'absolute',width:142,height:142,borderRadius:72,backgroundColor:C.pale},haloStyle]}/>
+  <Reanimated.View style={mascotStyle}><Mascot size={128}/></Reanimated.View>
+ </View>;
+}
+
+function ModelSetupProgress({progress,label}:{progress:number|null,label:string}){
+ const width=useSharedValue(0),value=useSharedValue(progress??0),sweep=useSharedValue(0),reduce=useReducedMotion();
+ useEffect(()=>{value.set(progress===null?0:withTiming(Math.max(0,Math.min(100,progress)),{duration:180,easing:EASE_OUT}));},[progress,value]);
+ useEffect(()=>{
+  if(progress!==null||reduce){sweep.set(0.5);return;}
+  sweep.set(withRepeat(withTiming(1,{duration:900,easing:ReanimatedEasing.linear}),-1,true));
+  return()=>cancelAnimation(sweep);
+ },[progress,reduce,sweep]);
+ const fillStyle=useAnimatedStyle(()=>progress===null
+  ?{width:42,transform:[{translateX:Math.max(0,width.get()-42)*sweep.get()}]}
+  :{width:width.get()*value.get()/100});
+ return <View accessible accessibilityRole="progressbar" accessibilityLabel={label} accessibilityValue={progress===null?undefined:{min:0,max:100,now:Math.round(progress)}} onLayout={e=>width.set(e.nativeEvent.layout.width)} style={{width:'100%',maxWidth:230,height:5,backgroundColor:C.line,borderRadius:3,overflow:'hidden'}}>
+  <Reanimated.View style={[{height:5,backgroundColor:C.blue,borderRadius:3},fillStyle]}/>
+ </View>;
+}
+
+/** Full-screen brand loading state for local model import and first load. */
+export function ModelSetupOverlay({stage,progress=null,onCancel}:{stage:ModelSetupStage|null,progress?:number|null,onCancel?:()=>void}){
+ const reduce=useReducedMotion();if(!stage)return null;
+ const copy=MODEL_SETUP_COPY[stage];
+ return <Modal visible transparent animationType={reduce?'none':'fade'} statusBarTranslucent navigationBarTranslucent onRequestClose={()=>{}}>
+  <GestureHandlerRootView style={{flex:1,backgroundColor:C.background}}>
+   <SafeAreaView accessibilityViewIsModal style={{flex:1,backgroundColor:C.background}} edges={['top','bottom']}>
+    <View style={{flex:1,alignItems:'center',justifyContent:'center',paddingHorizontal:28,gap:27}}>
+     <Wordmark size={30}/>
+     <ModelSetupMascot downloadAnimation={stage==='download-model'}/>
+     <Reanimated.View key={stage} entering={reduce?FadeIn.duration(100):FadeIn.duration(180).easing(EASE_OUT)} exiting={reduce?FadeOut.duration(80):FadeOut.duration(120).easing(EASE_OUT)} style={{alignItems:'center',gap:8}}>
+      <Txt bold size={22} style={{textAlign:'center'}}>{copy.title}</Txt>
+      <Txt size={14} color={C.muted} style={{textAlign:'center',lineHeight:21,maxWidth:300}}>{copy.body}</Txt>
+     </Reanimated.View>
+     <View style={{width:'100%',alignItems:'center',gap:10}}>
+      <ModelSetupProgress progress={stage==='load-model'||stage==='download-model'?progress:null} label={stage==='download-model'?'Downloading local AI':'Loading local AI'}/>
+      <Txt size={12} color={C.muted}>{(stage==='load-model'||stage==='download-model')&&progress!==null?`${Math.round(progress)}%`:'Your model stays on this phone'}</Txt>
+     </View>
+     {stage==='download-model'&&onCancel&&<Tap accessibilityRole="button" onPress={onCancel} style={{minHeight:44,paddingHorizontal:18,alignItems:'center',justifyContent:'center'}}><Txt size={14} bold color={C.muted}>Cancel download</Txt></Tap>}
+    </View>
+   </SafeAreaView>
+  </GestureHandlerRootView>
+ </Modal>;
 }

@@ -4,11 +4,14 @@ import Reanimated,{ Extrapolation, FadeIn, FadeOut, interpolate, useAnimatedStyl
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardEvents } from 'react-native-keyboard-controller';
 import { scheduleOnRN } from 'react-native-worklets';
-import { EASE_OUT, EASE_OUT_CSS, EASE_SHEET, SPRING_SHEET, project, rubberband } from '../theme/motion';
+import { EASE_OUT, EASE_OUT_CSS, EASE_SHEET, LIST_REFLOW, SPRING_SHEET, project, rubberband } from '../theme/motion';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { C,R,SPRING } from '../theme/tokens';
+/** Floating bar is 62pt high; Shell already applies the device's bottom safe area. */
+export const FLOATING_NAV_HEIGHT=62;
+export function useFloatingNavClearance(){return FLOATING_NAV_HEIGHT+12;}
 export function Icon({name,size=20,color=C.ink}:{name:string,size?:number,color?:string}) {return <Ionicons name={name as any} size={size} color={color}/>;}
 export function Txt({children,size=14,bold=false,color=C.ink,style,numberOfLines,selectable}:{children:React.ReactNode,size?:number,bold?:boolean,color?:string,style?:any,numberOfLines?:number,selectable?:boolean}) {return <Text selectable={selectable} numberOfLines={numberOfLines} style={[{fontSize:size,fontWeight:bold?'700':'400',color,lineHeight:size*1.37},style]}>{children}</Text>}
 /** Large titles get negative tracking, like SF Pro Display. */
@@ -44,7 +47,15 @@ export function Brand({onPress}:{onPress?:()=>void}) {return <Tap accessibilityR
 export function Sparkles({size=44}:{size?:number}) {const w=size*0.15,h=size*0.4;
  const dash=(left:number,top:number,deg:number)=><View style={{position:'absolute',left:left*size,top:top*size,width:w,height:h,borderRadius:w/2,backgroundColor:C.blue,transform:[{rotate:`${deg}deg`}]}}/>;
  return <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{width:size,height:size}}>{dash(0.62,0,22)}{dash(0.3,0.22,-28)}{dash(0.04,0.56,-68)}</View>;}
-export function StatusPill({status}:{status:string}) { const label:{[k:string]:string}={interested:'Interested',applied:'Applied',interview:'Interview',under_review:'Under review',offer:'Offer',rejected:'Rejected'};const green=['applied','offer'].includes(status); return <View style={{paddingHorizontal:10,paddingVertical:5,borderRadius:20,backgroundColor:green?C.greenSoft:status==='rejected'?C.redSoft:C.pale}}><Txt size={11} color={green?C.green:status==='rejected'?C.danger:C.blue}>{label[status]||status}</Txt></View>}
+const STATUS_STYLES:{[status:string]:{label:string,background:string,color:string}}={
+ interested:{label:'Interested',background:C.pale,color:C.blue},
+ applied:{label:'Applied',background:'#E7F7FA',color:'#167A89'},
+ under_review:{label:'Under review',background:'#FFF3E3',color:'#A35B00'},
+ interview:{label:'Interview',background:'#F1ECFF',color:'#6543B8'},
+ offer:{label:'Offer',background:C.greenSoft,color:C.green},
+ rejected:{label:'Rejected',background:C.redSoft,color:C.danger},
+};
+export function StatusPill({status}:{status:string}) {const style=STATUS_STYLES[status];return <View style={{paddingHorizontal:10,paddingVertical:5,borderRadius:20,backgroundColor:style?.background||C.pale}}><Txt size={11} color={style?.color||C.muted}>{style?.label||status}</Txt></View>}
 export function SectionTitle({children,right,onRight}:{children:string,right?:string,onRight?:()=>void}) {return <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:9}}><Txt size={17} bold>{children}</Txt>{right&&<Tap accessibilityRole="button" hitSlop={12} onPress={onRight}><Txt size={13} color={C.blue}>{right}</Txt></Tap>}</View>}
 /** Provider logo when available; a neutral briefcase tile when missing or offline. Never a guessed logo. */
 export function CompanyLogo({uri,size=40}:{uri?:string,size?:number}) {const [failed,setFailed]=useState(false);const box={width:size,height:size,borderRadius:size*0.26};
@@ -138,7 +149,7 @@ export const SCRIM_IN=FadeIn.duration(200).easing(EASE_OUT),SCRIM_OUT=FadeOut.du
 /** Anchored menu. Mount/unmount it conditionally: the entering/exiting animations run on the UI thread. */
 export function Popover({origin,style,children}:{origin:'top right'|'bottom right',style:StyleProp<ViewStyle>,children:React.ReactNode}) {
  const reduce=useReducedMotion();
- return <Reanimated.View entering={reduce?FADE_IN:popIn} exiting={reduce?FADE_OUT:popOut} accessibilityViewIsModal style={[{position:'absolute',backgroundColor:C.white,borderRadius:18,borderWidth:1,borderColor:C.line,shadowColor:'#33446A',shadowOpacity:0.16,shadowRadius:18,elevation:13,transformOrigin:origin},style]}>{children}</Reanimated.View>;
+ return <Reanimated.View layout={reduce?undefined:LIST_REFLOW} entering={reduce?FADE_IN:popIn} exiting={reduce?FADE_OUT:popOut} accessibilityViewIsModal style={[{position:'absolute',backgroundColor:C.white,borderRadius:18,borderWidth:1,borderColor:C.line,shadowColor:'#33446A',shadowOpacity:0.16,shadowRadius:18,elevation:13,transformOrigin:origin},style]}>{children}</Reanimated.View>;
 }
 
 /** iOS-style pull-down: a compact pill showing the current choice; the menu opens anchored under it. */

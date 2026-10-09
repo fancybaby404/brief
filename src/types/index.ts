@@ -9,8 +9,8 @@ export type Application = {
   pay?: Pay; // structured provider salary (converted for display); manual jobs keep only the typed `salary`
 };
 export type Event = { id: string; applicationId: string | null; title: string; date: string; notes: string; };
-export type Message = { id: string; role: 'user'|'assistant'; content: string; createdAt: string; thread: string; };
+export type Message = { id: string; role: 'user'|'assistant'; content: string; createdAt: string; thread: string; imageUri?: string; suggestions?: string[]; };
 export type Profile = { name: string; skills: string; education: string; experience: string; goals: string; resumeUri: string; resumeText: string; useResumeForAI: boolean; };
 export type RemoteJob = { id: string; company: string; title: string; location: string; salary: string; pay?: Pay; employmentType: string; description: string; url: string; logo: string; tags: string[]; level: string; industry: string; postedAt: string; };
-export type Page = 'home' | 'jobs' | 'calendar' | 'mock' | 'applications' | 'job-detail' | 'application-detail' | 'chat' | 'resume' | 'notifications' | 'settings' | 'add-job' | 'onboarding';
+export type Page = 'home' | 'jobs' | 'calendar' | 'mock' | 'applications' | 'job-detail' | 'application-detail' | 'chat' | 'resume' | 'notifications' | 'settings' | 'onboarding';
 export type Tab = 'home'|'jobs'|'calendar'|'mock';

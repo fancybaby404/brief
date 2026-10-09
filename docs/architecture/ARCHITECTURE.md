@@ -9,27 +9,27 @@ React Native 0.86 via Expo SDK 57; TypeScript strict mode; real-device **develop
 - `src/lib/appContext.tsx`: current screen state + application/event/profile repository facade.
 - `src/lib/db.ts`: one SQLite file with JSON payload rows. Good for hackathon; eventually index/filter SQL columns and transactions/migrations.
 - `src/lib/jobs.ts`: only network job discovery. `Jobicy` public remote listings; not an application submission API. Requires internet and use terms.
-- `src/lib/imports.ts`: native image picking, OCR, resume document picking, model copy.
-- `src/lib/ai.ts`: single local model loader, completion endpoint, persona-specific system prompts, model error propagation.
+- `src/lib/imports.ts`: Expo Camera/gallery photo selection, on-device OCR, public job-page text retrieval, resume document picking, model copy and direct curated GGUF downloads. `src/lib/modelCatalog.ts` pins the Qwen3-VL model and matching image encoder to one immutable source revision.
+- `src/lib/ai.ts`: local GGUF model loader with an optional matching vision projector, completion endpoint, persona-specific system prompts, model error propagation.
 
 ## Motion & input
-`react-native-reanimated` 4 + `react-native-worklets` (UI-thread animation), `react-native-gesture-handler` (UI-thread gestures; `GestureHandlerRootView` at the root and inside each `Modal`), `react-native-keyboard-controller` (`KeyboardProvider` at the root; composers use its `KeyboardAvoidingView`). The worklets Babel plugin is added by `babel-preset-expo`. Tokens live in `src/theme/motion.ts`. Core `Animated` remains only for native-driver ambient loops (cloud, typing dots, skeleton, mascot reactions).
+`react-native-reanimated` 4 + `react-native-worklets` (UI-thread animation), `react-native-gesture-handler` (UI-thread gestures; `GestureHandlerRootView` at the root and inside each `Modal`), `react-native-keyboard-controller` (`KeyboardProvider` at the root; composers use its `KeyboardAvoidingView`). The worklets Babel plugin is added by `babel-preset-expo`. Tokens live in `src/theme/motion.ts`. Core `Animated` remains for the existing native-driver ambient loops; chat waiting dots use Reanimated.
 
 ## Data boundary & schema
-**SQLite persisted:** applications (id, company, title, status, description, etc), calendar events, message threads and profile info (experience, skills, resume URI, extracted text), imported GGUF URI.
+**SQLite persisted:** applications (id, company, title, status, description, etc), calendar events, message threads (including private image URI and generated suggestions) and profile info (experience, skills, resume URI, extracted text), imported GGUF and optional projector URIs.
 
 Application: id, company, title, status, location, salary, employmentType, description, sourceUrl, createdAt, appliedAt?, notes.
 Event: id, applicationId?, title, date ISO, notes.
 Profile: name, skills, education, experience, goals, resumeUri, resumeText.
 Message: id, thread, user/assistant role, content, timestamp.
 
-**Threat model:** job descriptions and OCR text are untrusted inputs; never allow them to override system prompts, trigger external URLs, read other local files, or exfiltrate data. Don't log candidate PII. Keep model file private and local. Remote APIs receive only search keywords; never upload resume data or message transcript. For resume removal delete the copied local file as well (follow-up action).
+**Threat model:** job descriptions, pasted web pages, and OCR text are untrusted inputs; never allow them to override system prompts, trigger external URLs, read other local files, or exfiltrate data. Don't log candidate PII. Keep model file private and local. Job discovery sends only search keywords; a job URL is fetched directly only after the user pastes it and taps Continue. Never upload resume data or message transcripts. For resume removal delete the copied local file as well (follow-up action).
 
 ## Local AI execution
-Select .gguf locally, copy to app document directory, `llama.rn.initLlama` on device, `completion({ messages, n_predict, temperature })`. `n_ctx=2048`, CPU initial default for maximal device portability, GPU and prompt sizes after physical profiling. `ensureModel` errors must be visible, with Settings CTA. There is no cloud fallback. See `../ai/LOCAL_AI.md`.
+Download a curated GGUF from its pinned Hugging Face source or import a .gguf locally, store it in app-private documents, then call `llama.rn.initLlama` on device and `completion({ messages, n_predict, temperature })`. `n_ctx=2048`, CPU initial default for maximal device portability, GPU and prompt sizes after physical profiling. `ensureModel` errors must be visible, with Settings CTA. There is no cloud fallback. See `../ai/LOCAL_AI.md`.
 
 ## OCR
-ImagePicker camera/library -> Expo OCR Kit platform-native Vision/ML Kit -> raw string -> LLM structured extraction with JSON contract -> human review form. OCR itself should remain usable when LLM fails; save manually.
+Full-screen Expo Camera/gallery -> capture preview -> Expo OCR Kit platform-native Vision/ML Kit -> raw string -> optional local LLM structured extraction -> editable human review -> SQLite. Pasted http(s) job links are fetched only after the user submits them; readable HTML/metadata is passed to the same local extraction contract. OCR and page retrieval stay useful when Local AI fails; the original text remains editable and the required company/title can be entered manually. Job page contents are untrusted data and never trigger links or commands.
 
 ## Resume
 DocumentPicker -> file copied into private app documents -> locally extract native text for digital PDF via Expo PDF Text Extract when supported -> editable `experience/education/skills/goals` plus extracted text in local prompts. DOCX and scanned PDFs need parser/OCR extension; no claims otherwise. Large Resume preview in starter is a formatted visual summary, **not actual PDF page rendering**. Planned native PDF renderer: react-native-pdf + compatible config plugin, with device QA.

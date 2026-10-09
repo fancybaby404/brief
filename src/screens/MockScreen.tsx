@@ -6,10 +6,10 @@ import {useBrief} from '../lib/appContext';import {uid,saveMessage,listMessages}
 import {LiveMascot} from '../components/LiveMascot';
 import {EmptyState,InlineError,MessageBubble,ModelSetupCard,ThinkingBubble,useModelInstalled} from '../components/States';
 import {hasProfileDetails} from '../lib/profile';
-import {CloudHalo,CompanyLogo,Icon,Mascot,StatusPill,Tap,Txt,useKeyboardVisible} from '../components/Ui';import type {Message} from '../types';
+import {CloudHalo,CompanyLogo,Icon,Mascot,StatusPill,Tap,Txt,useKeyboardVisible,useFloatingNavClearance} from '../components/Ui';import type {Message} from '../types';
 const BEGIN='Begin the interview with your first question.';
 const FINISH='Please end this interview and give me specific overall feedback.';
-export function MockScreen(){const {applications,profile,mockJob:job,openMock,go,goTab}=useBrief();const [messages,setMessages]=useState<Message[]>([]),[value,setValue]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');const scroll=useRef<ScrollView>(null);
+export function MockScreen(){const {applications,profile,mockJob:job,openMock,go,goTab,openAddJob}=useBrief();const bottomClearance=useFloatingNavClearance();const [messages,setMessages]=useState<Message[]>([]),[value,setValue]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');const scroll=useRef<ScrollView>(null);
  const insets=useSafeAreaInsets();const kb=useKeyboardVisible();
  const openedAt=useRef(new Date().toISOString()).current; // messages newer than this animate in; history doesn't
  const installed=useModelInstalled();const noModel=installed===false||error===MODEL_MISSING;
@@ -22,9 +22,9 @@ export function MockScreen(){const {applications,profile,mockJob:job,openMock,go
  async function send(text:string){const t=text.trim();if(!job||busy||!t||noModel)return;const history=messages;const m:Message={id:uid('mock'),role:'user',content:t,thread,createdAt:new Date().toISOString()};setMessages(old=>[...old,m]);await saveMessage(m);setValue('');await reply(t,history);}
  function retry(){const i=messages.map(m=>m.role).lastIndexOf('user');if(i>=0&&!busy)void reply(messages[i].content,messages.slice(0,i));}
 
- if(!job)return <ScrollView contentContainerStyle={{padding:20,paddingBottom:115,alignItems:'center',gap:16}}><View style={{marginTop:12}}><CloudHalo size={204}><LiveMascot size={140}/></CloudHalo></View><Txt size={21} bold style={{textAlign:'center'}}>Who are you interviewing for?</Txt><Txt color={C.muted} style={{textAlign:'center'}}>Choose one of your saved applications to start a mock interview.</Txt>
+ if(!job)return <ScrollView contentContainerStyle={{padding:20,paddingBottom:bottomClearance,alignItems:'center',gap:16}}><View style={{marginTop:12}}><CloudHalo size={204}><LiveMascot size={140}/></CloudHalo></View><Txt size={21} bold style={{textAlign:'center'}}>Who are you interviewing for?</Txt><Txt color={C.muted} style={{textAlign:'center'}}>Choose one of your saved applications to start a mock interview.</Txt>
  <View style={{width:'100%',gap:8}}>
-  {applications.length===0?<EmptyState card compact mascot={false} title="No saved jobs yet" body="Mock interviews are built from a job you’ve saved, so the questions fit the role." action={{label:'Add a job',onPress:()=>go('add-job')}} secondary={{label:'Explore jobs',onPress:()=>goTab('jobs')}}/>:<>
+  {applications.length===0?<EmptyState card compact mascot={false} title="No saved jobs yet" body="Mock interviews are built from a job you’ve saved, so the questions fit the role." action={{label:'Add a job',onPress:()=>openAddJob('manual')}} secondary={{label:'Explore jobs',onPress:()=>goTab('jobs')}}/>:<>
   {installed===false&&<ModelSetupCard feature="Mock interview practice" onOpenSettings={()=>go('settings')}/>}
   {!hasProfileDetails(profile)&&<Tap accessibilityRole="button" onPress={()=>go('resume')} style={{flexDirection:'row',alignItems:'center',gap:10,padding:12,borderRadius:14,backgroundColor:C.pale}}><Icon name="document-text-outline" size={20} color={C.blue}/><Txt size={13} color={C.ink} style={{flex:1}}>Add your resume for questions tailored to you</Txt><Icon name="chevron-forward" size={15} color={C.blue}/></Tap>}
   {applications.map(a=><Tap key={a.id} accessibilityRole="button" onPress={()=>openMock(a)} style={{padding:13,backgroundColor:C.white,borderColor:C.line,borderWidth:1,borderRadius:18,flexDirection:'row',gap:10,alignItems:'center'}}><CompanyLogo uri={a.logoUrl} size={40}/><View style={{flex:1}}><Txt bold>{a.company}</Txt><Txt color={C.muted} size={12} style={{flexShrink:1}}>{a.title}</Txt></View><StatusPill status={a.status}/><Icon name="chevron-forward" color={C.soft} size={15}/></Tap>)}
@@ -41,7 +41,7 @@ export function MockScreen(){const {applications,profile,mockJob:job,openMock,go
  {noModel&&<ModelSetupCard feature="Mock interview practice" onOpenSettings={()=>go('settings')}/>}
  {!!error&&!noModel&&<InlineError message={error} onRetry={retry}/>}
  </ScrollView>
- <View style={{paddingHorizontal:17,paddingBottom:kb?8:insets.bottom+82,gap:7,opacity:noModel?0.5:1}}>
+ <View style={{paddingHorizontal:17,paddingBottom:kb?8:82,gap:7,opacity:noModel?0.5:1}}>
  {answered&&!noModel&&<Tap accessibilityRole="button" disabled={busy} onPress={()=>void send(FINISH)} style={{alignSelf:'flex-start',paddingVertical:6}}><Txt color={C.blue} size={13} bold>Finish & get feedback</Txt></Tap>}
  <View style={{flexDirection:'row',backgroundColor:C.white,borderRadius:22,alignItems:'center',padding:6,borderWidth:1,borderColor:C.line}}><TextInput accessibilityLabel="Your answer" editable={!noModel} value={value} onChangeText={setValue} style={{flex:1,padding:8,color:C.ink,maxHeight:120}} placeholder={noModel?'Set up on-device AI to practice':'Type your answer...'} placeholderTextColor={C.soft} multiline/><Tap accessibilityRole="button" accessibilityLabel="Send answer" disabled={busy||noModel||!value.trim()} onPress={()=>void send(value)} style={{backgroundColor:C.blue,opacity:busy||noModel||!value.trim()?.5:1,borderRadius:20,width:40,height:40,alignItems:'center',justifyContent:'center'}}><Icon name="arrow-up" color={C.white}/></Tap></View></View>
  </KeyboardAvoidingView>;

@@ -10,18 +10,20 @@ These are **not** claimed as passed. The agent must mark each result PASS/FAIL w
 - No secrets or resume bytes in Git; no `*.gguf` model weights bundled or cloud model URL.
 
 ## UI & navigation
-- Floating WHITE 4-item tab bar, separately floating blue +, + popup ~50% width exactly Add Job and Ask Brief, two rows without subtitles.
+- Floating WHITE 4-item tab bar, separately floating blue +, + popup ~50% width with root Add Job and Ask Brief. Add Job expands in the same popup to Camera / Photo, Paste job link, and Enter manually.
 - Top right profile PERSON icon; menu only name, Resume, Notifications, Settings. No Career Profile entry and no notification bell icon.
 - Dashboard mascot left (NO arms), bubble right, REAL blue bar chart, recent applications See All, no Up Next or rainbow progress tiles.
 - Applications see all ONE list, search and sort; open/update/delete app.
 - Jobs/Calendar/Mock/details screens, scroll, iOS safe areas, keyboard, small phone and large text.
 - Job detail initially FULL PAGE with NO "save to your applications" popup. User-initiated popover and real external URL.
 - Resume large preview plus editable summary, no filename label/status banner and no how-it-works marketing block.
-- Ask Brief no four duplicated suggestion cards, only bottom suggestion chips.
+- Ask Brief has model-generated, conversation-specific bottom suggestions; hide suggestions when no local model is installed. Text-only models keep image attachment disabled; a compatible vision model plus projector enables local image chat.
 
 ## Functional
 - First run skip/onboard/resume; reopen app persists profile.
-- Add manual job, screenshot/photo OCR, with model and without model; company/title reviewed, save state accurate.
+- Add manual job from the draggable sheet; only company and position required, More details starts collapsed. Test sheet dismissal and keyboard avoidance.
+- Add a job with the full-screen camera and gallery: permissions, capture, preview, retake, use photo, OCR, Local AI present/missing/failing, editable review, save.
+- Paste a job link: valid readable page, blocked/unsupported page, invalid URL, network timeout, local model present/missing; verify manual fallback and editable review.
 - Import PDF digital text locally, editable summary; evaluate DOCX/scanned fallback, OS preview/share.
 - Multiple applications and status updates persist across restart; search/sort works.
 - Calendar create, mark dates, remove; time zone and scheduled notifications follow-ups tracked.

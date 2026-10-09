@@ -17,7 +17,7 @@ npx eas-cli@latest build --profile development --platform android   # cloud dev 
 # or npm run ios                       # on macOS with Xcode
 ```
 
-Open **Settings → Import GGUF model** to select an already downloaded compatible small Q4 GGUF file from your phone. Then **Test local model**. No model = explicit warning for AI actions, not hidden internet inference. Both `llama.rn` and `expo-ocr-kit` require a **development build, not Expo Go**.
+Open **Settings → On-device AI** and tap **Download model** to install the optional Qwen3‑VL 2B GGUF plus its matching image encoder directly from Hugging Face, or import a compatible model already on your phone. The pair is about 1.6 GB. Brief validates image support before switching models; the download does not start until the user taps the button. Inference stays on-device and no prompts are sent to the model source. `expo-camera`, `llama.rn`, and `expo-ocr-kit` require a **development build, not Expo Go**.
 
 **Start your coding agent:** open `prompts/INITIAL_PROMPT.md`, paste its contents into Claude Code with this directory as working directory. It forces a full documentation read, skill verification/install, implementation verification, and quality gates.
 
@@ -40,7 +40,7 @@ Open **Settings → Import GGUF model** to select an already downloaded compatib
 - Onboarding (resume optional, manually supplied skills/experience optional, skip)
 - Home: mascot left + conversational card right, last four weeks' application bars, recent list
 - Applications: local list, search, sorting, statuses and detail
-- Add Job: manual, photo/gallery OCR, local model JSON extraction if installed, user review then save
+- Add Job: anchored quick-menu submenu, in-app Expo Camera/gallery preview, on-device OCR and optional local extraction, readable job-link import, minimal manual sheet, editable review then save
 - Jobs: fetch public remote listings from Jobicy; open details, visit listing, save for later, mark interested/applied **in Brief**
 - Job detail: distinguish opening employer page vs tracking state; ask AI
 - Calendar: month navigation, local events and long-press delete
@@ -49,7 +49,7 @@ Open **Settings → Import GGUF model** to select an already downloaded compatib
 - Profile menu: profile icon top right → Resume / Notifications / Settings
 - Resume: local PDF/DOCX import; local PDF text extraction for digital PDF if supported; manually editable skills/education/experience; visual summary and OS open/share
 - Settings: local .gguf import and testing
-- Bottom: white floating four-destination pill (Home / Jobs / Calendar / Mock) plus **separate** blue square rounded +. Popup is ~half screen width and exactly **Add Job / Ask Brief**, no subtitles.
+- Bottom: white floating four-destination pill (Home / Jobs / Calendar / Mock) plus **separate** blue square rounded +. Popup is ~half screen width; its root is **Add Job / Ask Brief**, and Add Job expands in place to Camera / Photo, Paste job link, or Enter manually.
 
 ## Important limitations
 

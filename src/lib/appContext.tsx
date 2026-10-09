@@ -1,10 +1,11 @@
-import React,{createContext,useContext,useEffect,useRef,useState} from 'react';
-export type AddJobIntent='library'|'camera'|'manual';
+import React,{createContext,useContext,useEffect,useState} from 'react';
+export type AddJobIntent='library'|'camera'|'manual'|'link';
 import { Alert,BackHandler } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as DB from './db';
 import type { Application,Event,Profile,RemoteJob,Page,Tab } from '../types';
 import { formatPay,type Pay } from './currency';
+import type { TimeFormat } from './time';
 import { cachedRates,refreshRates,STALE_MS,type CachedRates } from './rates';
 export type Toast={id:number,message:string,action?:{label:string,onPress:()=>void}};
 type AppState={
@@ -16,10 +17,10 @@ type AppState={
  chatJob:Application|null;openChat:(job?:Application|null)=>void;
  mockJob:Application|null;openMock:(job:Application|null)=>void;
  quick:boolean;toggleQuick:()=>void;profileMenu:boolean;toggleProfileMenu:()=>void;
- currency:string;setCurrency:(c:string)=>Promise<void>;fx:CachedRates|null;fxError:string;refreshFx:()=>Promise<void>;money:(x:{pay?:Pay,salary:string})=>string;
+ currency:string;setCurrency:(c:string)=>Promise<void>;timeFormat:TimeFormat;setTimeFormat:(format:TimeFormat)=>Promise<void>;fx:CachedRates|null;fxError:string;refreshFx:()=>Promise<void>;money:(x:{pay?:Pay,salary:string})=>string;
  toast:Toast|null;showToast:(message:string,action?:Toast['action'])=>void;
  ready:boolean;storageError:string;retryStorage:()=>void;finishOnboarding:(next?:Page)=>Promise<void>;replayOnboarding:()=>Promise<void>;
- openAddJob:(intent:AddJobIntent)=>void;takeAddJobIntent:()=>AddJobIntent|null;
+ addJobIntent:AddJobIntent|null;openAddJob:(intent:AddJobIntent)=>void;closeAddJob:()=>void;
 };
 const Context=createContext<AppState|null>(null);
 export function useBrief(){const c=useContext(Context);if(!c)throw new Error('BriefProvider missing');return c;}
@@ -28,18 +29,20 @@ export function BriefProvider({children}:{children:React.ReactNode}) {
  const [ready,setReady]=useState(false),[page,setPage]=useState<Page>('home'),[tab,setTab]=useState<Tab>('home');
  const [applications,setApplications]=useState<Application[]>([]),[events,setEvents]=useState<Event[]>([]),[profile,setProfile]=useState(emptyProfile);
  const [selectedApp,setSelectedApp]=useState<Application|null>(null),[selectedJob,setSelectedJob]=useState<RemoteJob|null>(null),[chatJob,setChatJob]=useState<Application|null>(null),[mockJob,setMockJob]=useState<Application|null>(null);
- const [quick,setQuick]=useState(false),[profileMenu,setProfileMenu]=useState(false);
+ const [quick,setQuick]=useState(false),[profileMenu,setProfileMenu]=useState(false),[addJobIntent,setAddJobIntent]=useState<AddJobIntent|null>(null);
  // Open SQLite and load everything. On failure the app shows a recoverable error screen instead of running on a broken database.
  const [storageError,setStorageError]=useState(''),[loadAttempt,setLoadAttempt]=useState(0);
  // Salary display currency. Rates are cached in SQLite (works offline) and refreshed in the background when stale.
  const [currency,setCurrencyState]=useState('PHP'),[fx,setFx]=useState<CachedRates|null>(null),[fxError,setFxError]=useState('');
+ const [timeFormat,setTimeFormatState]=useState<TimeFormat>('12h');
  const refreshFx=async()=>{try{setFx(await refreshRates());setFxError('');}catch(e){setFxError((e as Error).message);}};
  const setCurrency=async(c:string)=>{setCurrencyState(c);await DB.setPref('currency',c);if(c!=='original'&&!fx)void refreshFx();};
+ const setTimeFormat=async(format:TimeFormat)=>{setTimeFormatState(format);await DB.setPref('timeFormat',format);};
  const money=(x:{pay?:Pay,salary:string})=>x.pay?formatPay(x.pay,currency,fx?.rates??null).text:x.salary;
  const [toast,setToast]=useState<Toast|null>(null);
  const showToast=(message:string,action?:Toast['action'])=>{const id=Date.now();setToast({id,message,action});setTimeout(()=>setToast(t=>t?.id===id?null:t),2800);};
- useEffect(()=>{(async()=>{setStorageError('');try{await DB.initializeDb();const [a,e,p,d,cur,cached]=await Promise.all([DB.listApplications(),DB.listEvents(),DB.getProfile(),DB.getPref('onboarded'),DB.getPref('currency'),cachedRates()]);setApplications(a);setEvents(e);setProfile(p);setPage(d?'home':'onboarding');
-  const c=cur||'PHP';setCurrencyState(c);setFx(cached);
+ useEffect(()=>{(async()=>{setStorageError('');try{await DB.initializeDb();const [a,e,p,d,cur,tf,cached]=await Promise.all([DB.listApplications(),DB.listEvents(),DB.getProfile(),DB.getPref('onboarded'),DB.getPref('currency'),DB.getPref('timeFormat'),cachedRates()]);setApplications(a);setEvents(e);setProfile(p);setPage(d?'home':'onboarding');
+  const c=cur||'PHP';setCurrencyState(c);setTimeFormatState(tf==='24h'?'24h':'12h');setFx(cached);
   if(c!=='original'&&(!cached||Date.now()-new Date(cached.fetchedAt).getTime()>STALE_MS))void refreshFx();
  }catch(e){setStorageError((e as Error)?.message||String(e));}finally{setReady(true);}})();},[loadAttempt]);
  const retryStorage=()=>{setReady(false);setLoadAttempt(n=>n+1);};
@@ -65,10 +68,8 @@ export function BriefProvider({children}:{children:React.ReactNode}) {
   return false;});return ()=>sub.remove();},[page,tab,quick,profileMenu]);
  const finishOnboarding=async(next:Page='home')=>{await DB.setPref('onboarded','yes');setTab('home');go(next);};
  const replayOnboarding=async()=>{await DB.setPref('onboarded','');go('onboarding');};
- // Lets onboarding (or any shortcut) open Add Job with an import already started; consumed once by AddJobScreen.
- const addJobIntent=useRef<AddJobIntent|null>(null);
- const openAddJob=(intent:AddJobIntent)=>{addJobIntent.current=intent;go('add-job');};
- const takeAddJobIntent=()=>{const i=addJobIntent.current;addJobIntent.current=null;return i;};
- const value:AppState={page,tab,go,goTab,back,applications,events,profile,updateProfile,putApp,removeApp,putEvent,removeEvent,selectedApp,openApp,selectedJob,openJob,chatJob,openChat,mockJob,openMock,quick,toggleQuick:()=>{setProfileMenu(false);setQuick(v=>!v)},profileMenu,toggleProfileMenu:()=>{setQuick(false);setProfileMenu(v=>!v)},currency,setCurrency,fx,fxError,refreshFx,money,toast,showToast,ready,storageError,retryStorage,finishOnboarding,replayOnboarding,openAddJob,takeAddJobIntent};
+ const openAddJob=(intent:AddJobIntent)=>{setQuick(false);setProfileMenu(false);setAddJobIntent(intent);};
+ const closeAddJob=()=>setAddJobIntent(null);
+ const value:AppState={page,tab,go,goTab,back,applications,events,profile,updateProfile,putApp,removeApp,putEvent,removeEvent,selectedApp,openApp,selectedJob,openJob,chatJob,openChat,mockJob,openMock,quick,toggleQuick:()=>{setProfileMenu(false);setQuick(v=>!v)},profileMenu,toggleProfileMenu:()=>{setQuick(false);setProfileMenu(v=>!v)},currency,setCurrency,timeFormat,setTimeFormat,fx,fxError,refreshFx,money,toast,showToast,ready,storageError,retryStorage,finishOnboarding,replayOnboarding,addJobIntent,openAddJob,closeAddJob};
  return <Context.Provider value={value}>{children}</Context.Provider>;
 }

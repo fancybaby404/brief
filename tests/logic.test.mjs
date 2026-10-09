@@ -24,6 +24,12 @@ test('maps Jobicy salary fields into structured pay', () => {
   assert.equal(j.salary, '€123,000–142,375 / yr');
 });
 
+test('does not assume USD when Jobicy omits a salary currency', () => {
+  const j = mapJobicyJob({ ...jobicy, salaryMin: 123000, salaryPeriod: 'yearly' });
+  assert.deepEqual(j.pay, { min: 123000, max: 0, currency: '', period: 'year' });
+  assert.equal(j.salary, '123,000 / yr · currency not listed');
+});
+
 test('missing salary stays empty instead of an invented value', () => {
   assert.equal(mapJobicyJob(jobicy).salary, '');
   assert.equal(mapJobicyJob(jobicy).pay, undefined);

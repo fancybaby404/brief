@@ -7,9 +7,10 @@ export const JOBICY_CREDIT_URL = 'https://jobicy.com';
 
 const PERIODS: Record<string, Period> = { yearly: 'year', monthly: 'month', weekly: 'week', daily: 'day', hourly: 'hour' };
 function pay(j: any): Pay | undefined {
-  const min = Number(j.salaryMin) || 0, max = Number(j.salaryMax) || 0;
+  const rawMin=Number(j.salaryMin),rawMax=Number(j.salaryMax);
+  const min=Number.isFinite(rawMin)&&rawMin>0?rawMin:0,max=Number.isFinite(rawMax)&&rawMax>0?rawMax:0;
   if (!min && !max) return undefined;
-  return { min, max, currency: String(j.salaryCurrency || 'USD'), period: PERIODS[String(j.salaryPeriod)] ?? '' };
+  return { min, max, currency: String(j.salaryCurrency || '').trim().toUpperCase(), period: PERIODS[String(j.salaryPeriod || '').toLowerCase()] ?? '' };
 }
 const arr = (v: unknown) => (Array.isArray(v) ? v : v ? [v] : []).map(String);
 const list = (v: unknown) => arr(v).join(', ');

@@ -1,11 +1,11 @@
 import React,{useEffect} from 'react';
 import {AccessibilityInfo,Pressable,View} from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {C} from '../theme/tokens';
-import Reanimated,{FadeIn,FadeOut,withTiming,type EntryExitAnimationFunction} from 'react-native-reanimated';
-import {Brand,Icon,Mascot,Popover,SCRIM_IN,SCRIM_OUT,Tap,Txt,useKeyboardVisible,useReducedMotion} from './Ui';
+import Reanimated,{FadeIn,FadeOut,FadeInRight,FadeOutLeft,withTiming,type EntryExitAnimationFunction} from 'react-native-reanimated';
+import {Brand,FLOATING_NAV_HEIGHT,Icon,Mascot,Popover,SCRIM_IN,SCRIM_OUT,Tap,Txt,useKeyboardVisible,useReducedMotion} from './Ui';
 import {EASE_OUT,EASE_OUT_CSS} from '../theme/motion';
 import {useBrief} from '../lib/appContext';
+import * as Haptics from 'expo-haptics';
 export function Header({plain=false,title}:{plain?:boolean,title?:string}) {
  const {back,toggleProfileMenu,go}=useBrief();
  return <View style={{height:59,flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:12}}>
@@ -21,22 +21,33 @@ const destinations: {key:'home'|'jobs'|'calendar'|'mock';label:string;icon:strin
  {key:'mock',label:'Mock',icon:'mic-outline',selected:'mic'}
 ];
 export function FloatingNav() {
- const {tab,goTab,toggleQuick,quick}=useBrief(); const insets=useSafeAreaInsets(); const reduce=useReducedMotion(); if(useKeyboardVisible())return null;
- return <View style={{position:'absolute',left:13,right:13,bottom:Math.max(insets.bottom,10),flexDirection:'row',gap:8,alignItems:'flex-end'}}>
- <View accessibilityRole="tablist" style={{flex:1,backgroundColor:C.white,borderRadius:26,minHeight:62,flexDirection:'row',alignItems:'center',justifyContent:'space-around',paddingHorizontal:5,borderWidth:1,borderColor:C.line,shadowColor:'#6686A9',shadowOpacity:0.10,shadowRadius:17,elevation:6}}>
- {destinations.map(d=><Tap key={d.key} accessibilityRole="tab" accessibilityLabel={d.label} accessibilityState={{selected:tab===d.key}} onPress={()=>goTab(d.key)} style={{alignItems:'center',justifyContent:'center',paddingHorizontal:5,minWidth:52,minHeight:55,gap:1}}><Icon name={tab===d.key?d.selected:d.icon} size={21} color={tab===d.key?C.blue:C.muted}/><Txt size={10} color={tab===d.key?C.blue:C.muted} bold={tab===d.key}>{d.label}</Txt></Tap>)}
+ const {tab,goTab,toggleQuick,quick}=useBrief(); const reduce=useReducedMotion(); if(useKeyboardVisible())return null;
+ return <View style={{position:'absolute',left:13,right:13,bottom:0,flexDirection:'row',gap:8,alignItems:'flex-end'}}>
+ <View accessibilityRole="tablist" style={{flex:1,backgroundColor:C.white,borderRadius:26,minHeight:FLOATING_NAV_HEIGHT,flexDirection:'row',alignItems:'center',justifyContent:'space-around',paddingHorizontal:5,borderWidth:1,borderColor:C.line,shadowColor:'#6686A9',shadowOpacity:0.10,shadowRadius:17,elevation:6}}>
+ {destinations.map(d=>{const active=tab===d.key;return <Tap key={d.key} accessibilityRole="tab" accessibilityLabel={d.label} accessibilityState={{selected:active}} onPress={()=>goTab(d.key)} style={{alignItems:'center',justifyContent:'center',paddingHorizontal:5,minWidth:52,minHeight:55,gap:1}}><Reanimated.View style={{transform:[{scale:active?1.06:1}],opacity:active?1:0.82,transitionProperty:['transform','opacity'],transitionDuration:reduce?0:140,transitionTimingFunction:EASE_OUT_CSS}}><Icon name={active?d.selected:d.icon} size={21} color={active?C.blue:C.muted}/></Reanimated.View><Txt size={10} color={active?C.blue:C.muted} bold={active}>{d.label}</Txt></Tap>;})}
  </View>
- <Tap accessibilityRole="button" accessibilityLabel={quick?'Close quick actions':'Quick actions'} accessibilityState={{expanded:quick}} onPress={toggleQuick} style={{width:60,height:62,backgroundColor:C.blue,borderRadius:19,alignItems:'center',justifyContent:'center',shadowColor:C.blue,shadowOpacity:0.25,shadowRadius:10,elevation:5}}><Reanimated.View style={{transform:[{rotate:quick?'45deg':'0deg'}],transitionProperty:'transform',transitionDuration:reduce?0:200,transitionTimingFunction:EASE_OUT_CSS}}><Icon name="add" size={31} color={C.white}/></Reanimated.View></Tap>
+ <Tap accessibilityRole="button" accessibilityLabel={quick?'Close quick actions':'Quick actions'} accessibilityState={{expanded:quick}} onPress={toggleQuick} style={{width:60,height:FLOATING_NAV_HEIGHT,backgroundColor:C.blue,borderRadius:19,alignItems:'center',justifyContent:'center',shadowColor:C.blue,shadowOpacity:0.25,shadowRadius:10,elevation:5}}><Reanimated.View style={{transform:[{rotate:quick?'45deg':'0deg'}],transitionProperty:'transform',transitionDuration:reduce?0:200,transitionTimingFunction:EASE_OUT_CSS}}><Icon name="add" size={31} color={C.white}/></Reanimated.View></Tap>
  </View>
 }
-export function Overlays(){const {quick,profileMenu,toggleQuick,toggleProfileMenu,go,openChat,profile}=useBrief();const insets=useSafeAreaInsets();
+export function Overlays(){const {quick,profileMenu,toggleQuick,toggleProfileMenu,go,openChat,openAddJob,profile}=useBrief();
+ const [addJobMenu,setAddJobMenu]=React.useState(false);
+ const reduce=useReducedMotion();
+ useEffect(()=>{if(!quick)setAddJobMenu(false);},[quick]);
  const row={flexDirection:'row',alignItems:'center',gap:12,minHeight:52,paddingHorizontal:14} as const;
  return <View style={{position:'absolute',top:0,left:0,right:0,bottom:0,zIndex:20}} pointerEvents="box-none">
  {(quick||profileMenu)&&<Reanimated.View entering={SCRIM_IN} exiting={SCRIM_OUT} style={{position:'absolute',top:0,bottom:0,left:0,right:0,backgroundColor:quick?'rgba(9,25,45,0.28)':'transparent'}}><Pressable accessibilityRole="button" accessibilityLabel="Close menu" style={{flex:1}} onPress={quick?toggleQuick:toggleProfileMenu}/></Reanimated.View>}
- {quick&&<Popover origin="bottom right" style={{width:'52%',right:13,bottom:Math.max(insets.bottom,10)+75,paddingVertical:4}}>
- <Tap accessibilityRole="button" onPress={()=>go('add-job')} style={row}><Icon name="briefcase-outline" size={22}/><Txt bold size={16} style={{flex:1}}>Add Job</Txt><Icon name="chevron-forward" color={C.soft} size={15}/></Tap>
- <View style={{height:1,backgroundColor:C.line,marginHorizontal:12}}/>
- <Tap accessibilityRole="button" onPress={()=>openChat()} style={row}><Mascot size={24}/><Txt bold size={16} style={{flex:1}}>Ask Brief</Txt><Icon name="chevron-forward" color={C.soft} size={15}/></Tap>
+ {quick&&<Popover origin="bottom right" style={{width:'52%',right:13,bottom:FLOATING_NAV_HEIGHT+13,paddingVertical:4}}>
+ <Reanimated.View key={addJobMenu?'add-job-options':'quick-actions'} entering={reduce?FadeIn.duration(110):FadeInRight.duration(170).easing(EASE_OUT)} exiting={reduce?FadeOut.duration(90):FadeOutLeft.duration(120).easing(EASE_OUT)}>
+ {!addJobMenu?<>
+  <Tap accessibilityRole="button" onPress={()=>{void Haptics.selectionAsync();setAddJobMenu(true);}} style={row}><Icon name="briefcase-outline" size={22}/><Txt bold size={16} style={{flex:1}}>Add Job</Txt><Icon name="chevron-forward" color={C.soft} size={15}/></Tap>
+  <View style={{height:1,backgroundColor:C.line,marginHorizontal:12}}/>
+  <Tap accessibilityRole="button" onPress={()=>openChat()} style={row}><Mascot size={24}/><Txt bold size={16} style={{flex:1}}>Ask Brief</Txt><Icon name="chevron-forward" color={C.soft} size={15}/></Tap>
+ </>:<>
+  <Tap accessibilityRole="button" accessibilityLabel="Back to quick actions" onPress={()=>{void Haptics.selectionAsync();setAddJobMenu(false);}} style={{...row,minHeight:42}}><Icon name="chevron-back" size={17} color={C.blue}/><Txt bold size={14} color={C.muted}>Add Job</Txt></Tap>
+  <View style={{height:1,backgroundColor:C.line,marginHorizontal:12}}/>
+  {([{label:'Camera / Photo',icon:'camera-outline',intent:'camera'},{label:'Paste job link',icon:'link-outline',intent:'link'},{label:'Enter manually',icon:'create-outline',intent:'manual'}] as const).map(option=><Tap key={option.intent} accessibilityRole="button" onPress={()=>{void Haptics.selectionAsync();openAddJob(option.intent);}} style={row}><Icon name={option.icon} size={21}/><Txt bold size={14} style={{flex:1}}>{option.label}</Txt></Tap>)}
+ </>}
+ </Reanimated.View>
  </Popover>}
  {profileMenu&&<Popover origin="top right" style={{right:12,top:52,width:210,padding:6}}>
  <View style={{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:10,paddingHorizontal:8}}><View style={{width:35,height:35,borderRadius:18,backgroundColor:C.pale,alignItems:'center',justifyContent:'center'}}><Icon name="person" color={C.blue}/></View><Txt bold style={{flex:1}} numberOfLines={1}>{profile.name||'Your account'}</Txt></View>
@@ -49,9 +60,9 @@ export function Overlays(){const {quick,profileMenu,toggleQuick,toggleProfileMen
 const TOAST_IN:EntryExitAnimationFunction=()=>{'worklet';return {initialValues:{opacity:0,transform:[{translateY:16}]},animations:{opacity:withTiming(1,{duration:250,easing:EASE_OUT}),transform:[{translateY:withTiming(0,{duration:250,easing:EASE_OUT})}]}};};
 const TOAST_OUT:EntryExitAnimationFunction=()=>{'worklet';return {initialValues:{opacity:1,transform:[{translateY:0}]},animations:{opacity:withTiming(0,{duration:200,easing:EASE_OUT}),transform:[{translateY:withTiming(16,{duration:200,easing:EASE_OUT})}]}};};
 /** Short confirmation (e.g. "Added to Brief · View"). Announced to screen readers; never the only feedback. */
-export function ToastHost(){const {toast}=useBrief();const insets=useSafeAreaInsets();const reduce=useReducedMotion();
+export function ToastHost(){const {toast}=useBrief();const reduce=useReducedMotion();
  useEffect(()=>{if(toast)AccessibilityInfo.announceForAccessibility(toast.message);},[toast?.id]);
- return <View pointerEvents="box-none" style={{position:'absolute',left:16,right:16,bottom:Math.max(insets.bottom,10)+80,zIndex:30}}>
+ return <View pointerEvents="box-none" style={{position:'absolute',left:16,right:16,bottom:FLOATING_NAV_HEIGHT+18,zIndex:30}}>
  {toast&&<Reanimated.View key={toast.id} entering={reduce?FadeIn.duration(150):TOAST_IN} exiting={reduce?FadeOut.duration(120):TOAST_OUT} style={{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:C.ink,borderRadius:16,paddingVertical:12,paddingHorizontal:16,shadowColor:'#0A1430',shadowOpacity:0.25,shadowRadius:16,shadowOffset:{width:0,height:6},elevation:10}}>
   <Icon name="checkmark-circle" size={20} color="#7CE0B0"/>
   <Txt bold size={14} color={C.white} style={{flex:1}}>{toast.message}</Txt>

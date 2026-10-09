@@ -17,8 +17,7 @@
     "android": {
       "package": "com.brief.localai",
       "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.CAMERA"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
@@ -29,6 +28,14 @@
       "expo-document-picker",
       "expo-image-picker",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Brief uses the camera to scan job listings.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "llama.rn",
         {
           "enableEntitlements": true,
@@ -37,7 +44,15 @@
         }
       ],
       "expo-build-properties",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-navigation-bar",
+        {
+          "style": "dark",
+          "enforceContrast": false
+        }
+      ],
+      "expo-image"
     ],
     "experiments": {
       "reactCompiler": false
