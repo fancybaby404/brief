@@ -13,7 +13,7 @@ Gates from `ACCEPTANCE_TESTS.md`. PASS needs evidence; BLOCKED names what is mis
 | Unit/static tests | PASS (2026-10-09) | `npm test`: 18/18 |
 | JS bundle builds | PASS (2026-10-09) | `npx expo export --platform android` → 2.1 MB Hermes bundle |
 | Jobicy live response | PASS (2026-10-09, desktop curl) | HTTP 200, 1.5 s; field shape captured in `tests/logic.test.mjs` |
-| Native Android dev build | BLOCKED | Needs Android Studio (SDK + JDK 17) on this PC |
+| Native Android dev build | PASS (2026-10-09) | EAS `development` profile, build 87dd59d0-9743-40ff-a528-854b3e13445f (APK). Not yet launched on a phone |
 | Native iOS dev build | BLOCKED | Needs macOS + Xcode |
 | UI & navigation gates on device | BLOCKED | Needs dev build |
 | SQLite persistence across force-close | BLOCKED | Needs dev build |
