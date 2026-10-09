@@ -15,7 +15,13 @@ export function Primary({label,onPress,secondary=false,disabled=false,large=fals
 export function Input({value,onChangeText,placeholder,multiline=false}:{value:string,onChangeText:(text:string)=>void,placeholder?:string,multiline?:boolean}) {return <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={C.soft} multiline={multiline} style={{backgroundColor:C.pale2,color:C.ink,borderRadius:12,padding:12,marginTop:5,minHeight:multiline?100:45,textAlignVertical:multiline?'top':'center',fontSize:14}}/>}
 export function Field({label,value,onChangeText,placeholder,multiline}:{label:string,value:string,onChangeText:(v:string)=>void,placeholder?:string,multiline?:boolean}) {return <View style={{marginBottom:11}}><Txt size={12} color={C.muted}>{label}</Txt><Input {...{value,onChangeText,placeholder,multiline}}/></View>}
 export function SmallIconButton({icon,onPress}:{icon:string,onPress:()=>void}) {return <Tap onPress={onPress} hitSlop={10} style={{width:36,height:36,alignItems:'center',justifyContent:'center',borderRadius:18,backgroundColor:C.pale2}}><Icon name={icon} color={C.blue} size={18}/></Tap>}
-export function Mascot({size=125}:{size?:number}) {return <Image source={require('../../assets/mascot-happy.png')} resizeMode="contain" style={{width:size,height:size}} accessibilityIgnoresInvertColors/>}
+/** Mascot faces, all cropped to the same 842×924 frame so swapping never shifts the body. No arms, ever. */
+export const FACES={
+ happy:require('../../assets/mascot-happy.png'),shocked:require('../../assets/mascot/shocked.png'),
+ question:require('../../assets/mascot/question.png'),sad:require('../../assets/mascot/sad.png'),error:require('../../assets/mascot/error.png'),
+} as const;
+export type Mood=keyof typeof FACES;
+export function Mascot({size=125,mood='happy'}:{size?:number,mood?:Mood}) {return <Image source={FACES[mood]} resizeMode="contain" style={{width:size,height:size}} accessibilityIgnoresInvertColors/>}
 /** Wordmark: lowercase "brief" in Fredoka Bold (700), loaded in App.tsx. */
 export const BRAND_FONT='Fredoka_700Bold';
 export function Wordmark({size=31}:{size?:number}) {return <View accessible accessibilityLabel="brief" style={{flexDirection:'row',alignItems:'center',gap:size*0.1}}><Text allowFontScaling={false} style={{fontFamily:BRAND_FONT,fontSize:size,lineHeight:size*1.23,color:'#050505',letterSpacing:-size*0.02,includeFontPadding:false}}>brief</Text><Mascot size={size*1.03}/></View>}
@@ -46,12 +52,14 @@ function Puff({d,left,top,color,period,dx,dy,still}:{d:number,left:number,top:nu
  return <Animated.View style={{position:'absolute',left,top,width:d,height:d,borderRadius:d/2,backgroundColor:color,transform:[{translateX:move(dx)},{translateY:move(dy)},{scale:t.interpolate({inputRange:[0,1],outputRange:[1,1.045]})}]}}/>;
 }
 export function CloudHalo({size,children}:{size:number,children:React.ReactNode}) {const still=useReducedMotion();const s=size;
- return <View style={{width:s,height:s*0.92,alignItems:'center',justifyContent:'center'}} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+ return <View style={{width:s,height:s*0.92,alignItems:'center',justifyContent:'center'}}>
+ <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{position:'absolute',top:0,left:0,right:0,bottom:0}}>
  <Puff still={still} d={s*0.46} left={0} top={s*0.3} color="#DCEAFF" period={7000} dx={-3} dy={2}/>
  <Puff still={still} d={s*0.5} left={s*0.5} top={s*0.22} color="#DCEAFF" period={8200} dx={3} dy={-2}/>
  <Puff still={still} d={s*0.66} left={s*0.17} top={0} color="#E3EFFF" period={9400} dx={1} dy={-4}/>
  <Puff still={still} d={s*0.24} left={s*0.2} top={s*0.1} color="rgba(255,255,255,0.75)" period={6200} dx={2} dy={-1}/>
  <View style={{position:'absolute',left:s*0.06,right:s*0.06,bottom:s*0.06,height:s*0.3,borderRadius:s*0.15,backgroundColor:'#E6F1FF'}}/>
+ </View>
  {children}
  </View>;
 }

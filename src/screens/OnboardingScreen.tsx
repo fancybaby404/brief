@@ -5,6 +5,7 @@ import {useBrief,type AddJobIntent} from '../lib/appContext';
 import {C} from '../theme/tokens';
 import {CloudHalo,CompanyLogo,Icon,Mascot,Primary,Sparkles,Tap,Txt,Wordmark,useReducedMotion} from '../components/Ui';
 import {ProfileForm} from '../components/ProfileForm';
+import {LiveMascot} from '../components/LiveMascot';
 import {deleteLocalFile,pickResume,readResumeText} from '../lib/imports';
 import {hasProfileDetails,listItems} from '../lib/profile';
 import type {Profile} from '../types';
@@ -38,7 +39,7 @@ function Rows({rows}:{rows:{icon:string,title:string,sub:string,onPress?:()=>voi
 function Welcome(){
  return <View style={{alignItems:'center',gap:20}}>
  <Wordmark size={44}/>
- <View><CloudHalo size={244}><Mascot size={176}/></CloudHalo><View style={{position:'absolute',left:4,top:16}}><Sparkles size={56}/></View></View>
+ <View><CloudHalo size={244}><LiveMascot size={176}/></CloudHalo><View style={{position:'absolute',left:4,top:16}}><Sparkles size={56}/></View></View>
  <View style={{gap:10,alignItems:'center'}}>
   <Text accessibilityRole="header" style={{fontSize:30,lineHeight:36,fontWeight:'800',letterSpacing:-0.8,color:C.ink}}>Welcome to brief</Text>
   <Txt size={17} color={C.muted} style={{textAlign:'center',lineHeight:24,maxWidth:320}}>Track jobs, prepare for interviews, and stay organized — all in one place, with the help of AI.</Txt>

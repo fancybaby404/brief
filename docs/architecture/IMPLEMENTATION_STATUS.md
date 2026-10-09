@@ -58,6 +58,10 @@
 - Functional, not placeholders: page 2 rows → `finishOnboarding()` then `openAddJob(intent)`; AddJobScreen consumes the intent once and starts library/camera import. Page 3 uploads via `pickResume`/`readResumeText` (honest notes for DOCX/scanned PDFs, offers manual entry), `ProfileForm` (pageSheet modal, keyboard-safe) saves name/goal/experience/education/skills, preview renders real profile data (`lib/profile.ts`, tested), AI toggle writes `useResumeForAI`. Everything saves to SQLite immediately.
 - Shared additions: `Primary` large + trailing icon, `Wordmark` (sized), `Sparkles`. Settings → "Show onboarding again" (`replayOnboarding`).
 
+### 2026-10-09 — interactive mascot
+- New faces from the user (SHOCKED, QUESTION, SAD, ERROR) cropped with pngjs to the exact `mascot-happy.png` frame (body bbox + 26 px; SAD's body is drawn 3 px left / 13 px higher, so its crop is offset to match). QUESTION's "???" was erased from the face and saved as `marks-question.png` so it can animate separately.
+- `LiveMascot`: all faces stay mounted (instant swaps, no first-decode flicker); press squish, escalating tap reactions, sparkle/??? marks, native-driver springs, timers cleaned up on unmount, screen-reader button with hint. `CloudHalo` now hides only its decorative puffs from accessibility so the mascot stays reachable.
+
 ## Next tasks in order
 1. **P0**: `scripts/setup.sh` + `npm run typecheck` + Android dev build; fix dependency APIs, permissions, runtime import errors, SafeArea/keyboard collisions, design bugs.
 2. **P0**: import/test Qwen Q4 GGUF on actual target phone; run airplane-mode chat and mock; reduce prompt/context memory footprint as needed.

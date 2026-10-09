@@ -6,6 +6,8 @@ Premium iOS feel, not visual noise. **A good job hunt organizer with a friendly 
 ## Identity
 - Brand: `brief` all lowercase in **Fredoka Bold (700)** (`@expo-google-fonts/fredoka`, SIL OFL), black, mini mascot alongside. Loaded at startup with expo-font; falls back to the system font if loading fails. Wordmark does not scale with Dynamic Type.
 - Mascot: `assets/mascot-happy-original.png` user-supplied; `mascot-happy.png` automatically alpha-cropped for rendering. White 2D flat briefcase, heavy black outline, black feet, black dot eyes/smile/buckle, **NO ARMS/HANDS EVER**. Only compatible emotions via simple black ASCII-like face changes, not 3D and never another creature. Blue simple sparkle shapes or pale blue circle behind it are acceptable.
+- Faces (user-supplied, `assets/mascot/`, all cropped to the same 842×924 frame as `mascot-happy.png` so swaps never move the body): happy (default), shocked, question (with a separate "???" overlay), sad, error (x_x). `Mascot mood=` for static use.
+- Interactive mascot (`LiveMascot`, Home, Mock picker/session, Ask Brief, onboarding welcome): squish on touch-down; taps escalate — surprised + tilt left + blue sparkle marks, puzzled + tilt right + "???", happy hop, x_x dizzy wobble — with a light haptic; marks fade and the face settles ~1 s after the last tap. Tilt pivots on the feet. State moods: "question" while local AI is generating, "sad" on errors. Reduce Motion keeps faces/marks, drops movement.
 - Large mascot LEFT of dashboard's speech bubble. On chat/mock larger mascot in calm blue halo; do not overpopulate screens with clones.
 
 ## Palette
