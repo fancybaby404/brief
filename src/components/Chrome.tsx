@@ -1,10 +1,10 @@
-import React from 'react';
-import {Pressable,View} from 'react-native';
+import React,{useEffect} from 'react';
+import {AccessibilityInfo,Pressable,View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {C} from '../theme/tokens';
-import Reanimated from 'react-native-reanimated';
+import Reanimated,{FadeIn,FadeOut,withTiming,type EntryExitAnimationFunction} from 'react-native-reanimated';
 import {Brand,Icon,Mascot,Popover,SCRIM_IN,SCRIM_OUT,Tap,Txt,useKeyboardVisible,useReducedMotion} from './Ui';
-import {EASE_OUT_CSS} from '../theme/motion';
+import {EASE_OUT,EASE_OUT_CSS} from '../theme/motion';
 import {useBrief} from '../lib/appContext';
 export function Header({plain=false,title}:{plain?:boolean,title?:string}) {
  const {back,toggleProfileMenu,go}=useBrief();
@@ -42,5 +42,20 @@ export function Overlays(){const {quick,profileMenu,toggleQuick,toggleProfileMen
  <View style={{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:10,paddingHorizontal:8}}><View style={{width:35,height:35,borderRadius:18,backgroundColor:C.pale,alignItems:'center',justifyContent:'center'}}><Icon name="person" color={C.blue}/></View><Txt bold style={{flex:1}} numberOfLines={1}>{profile.name||'Your account'}</Txt></View>
  {([{name:'Resume',icon:'document-text-outline',page:'resume'},{name:'Notifications',icon:'notifications-outline',page:'notifications'},{name:'Settings',icon:'settings-outline',page:'settings'}] as const).map(r=><Tap accessibilityRole="button" onPress={()=>go(r.page)} key={r.page} style={{...row,minHeight:48,paddingHorizontal:8,borderTopWidth:1,borderTopColor:C.line}}><Icon name={r.icon} color={C.ink}/><Txt bold size={14} style={{flex:1}}>{r.name}</Txt><Icon name="chevron-forward" color={C.muted} size={15}/></Tap>)}
  </Popover>}
+ </View>;
+}
+
+// Toast: rises 16 px into place above the tab bar and leaves the same way, ~20% faster (UI thread).
+const TOAST_IN:EntryExitAnimationFunction=()=>{'worklet';return {initialValues:{opacity:0,transform:[{translateY:16}]},animations:{opacity:withTiming(1,{duration:250,easing:EASE_OUT}),transform:[{translateY:withTiming(0,{duration:250,easing:EASE_OUT})}]}};};
+const TOAST_OUT:EntryExitAnimationFunction=()=>{'worklet';return {initialValues:{opacity:1,transform:[{translateY:0}]},animations:{opacity:withTiming(0,{duration:200,easing:EASE_OUT}),transform:[{translateY:withTiming(16,{duration:200,easing:EASE_OUT})}]}};};
+/** Short confirmation (e.g. "Added to Brief · View"). Announced to screen readers; never the only feedback. */
+export function ToastHost(){const {toast}=useBrief();const insets=useSafeAreaInsets();const reduce=useReducedMotion();
+ useEffect(()=>{if(toast)AccessibilityInfo.announceForAccessibility(toast.message);},[toast?.id]);
+ return <View pointerEvents="box-none" style={{position:'absolute',left:16,right:16,bottom:Math.max(insets.bottom,10)+80,zIndex:30}}>
+ {toast&&<Reanimated.View key={toast.id} entering={reduce?FadeIn.duration(150):TOAST_IN} exiting={reduce?FadeOut.duration(120):TOAST_OUT} style={{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:C.ink,borderRadius:16,paddingVertical:12,paddingHorizontal:16,shadowColor:'#0A1430',shadowOpacity:0.25,shadowRadius:16,shadowOffset:{width:0,height:6},elevation:10}}>
+  <Icon name="checkmark-circle" size={20} color="#7CE0B0"/>
+  <Txt bold size={14} color={C.white} style={{flex:1}}>{toast.message}</Txt>
+  {toast.action&&<Tap accessibilityRole="button" hitSlop={12} onPress={toast.action.onPress}><Txt bold size={14} color="#8EC2FF">{toast.action.label}</Txt></Tap>}
+ </Reanimated.View>}
  </View>;
 }

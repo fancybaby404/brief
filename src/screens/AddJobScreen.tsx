@@ -5,7 +5,7 @@ import {Card,Field,Heading,Icon,Primary,Txt,Tap} from '../components/Ui';import 
 import {pickJobImage,recognizeJobImage} from '../lib/imports';import {extractJob,MODEL_MISSING} from '../lib/ai';
 import {InlineError} from '../components/States';import type {ApplicationStatus} from '../types';
 export function AddJobScreen(){const {putApp,go,takeAddJobIntent}=useBrief();
- const [company,setCompany]=useState(''),[title,setTitle]=useState(''),[location,setLocation]=useState(''),[salary,setSalary]=useState(''),[employmentType,setEmploymentType]=useState(''),[description,setDescription]=useState(''),[url,setUrl]=useState(''),[status,setStatus]=useState<ApplicationStatus>('interested'),[busy,setBusy]=useState(false),[ocrText,setOcrText]=useState('');
+ const [company,setCompany]=useState(''),[title,setTitle]=useState(''),[location,setLocation]=useState(''),[salary,setSalary]=useState(''),[employmentType,setEmploymentType]=useState(''),[description,setDescription]=useState(''),[url,setUrl]=useState(''),[busy,setBusy]=useState(false),[ocrText,setOcrText]=useState('');
  const [step,setStep]=useState(''),[importError,setImportError]=useState(''),[aiNote,setAiNote]=useState<''|'missing'|'failed'>(''),lastCamera=useRef(false);
  /** Screenshot/photo → on-device OCR → on-device extraction. Each stage is shown; failures stay inline and keep what worked. */
  async function imageImport(camera=false){lastCamera.current=camera;setImportError('');setAiNote('');
@@ -25,7 +25,7 @@ export function AddJobScreen(){const {putApp,go,takeAddJobIntent}=useBrief();
  // Started from an onboarding shortcut: jump straight into the chosen import.
  useEffect(()=>{const i=takeAddJobIntent();if(i==='library')void imageImport();else if(i==='camera')void imageImport(true);},[]);
  async function save(){if(!company.trim()||!title.trim()){Alert.alert('Missing fields','Company and position are required.');return;}
- await putApp({id:uid('application'),company:company.trim(),title:title.trim(),location,salary,employmentType,description,sourceUrl:url,status,createdAt:new Date().toISOString(),appliedAt:status==='applied'?new Date().toISOString():null,notes:''});go('application-detail');}
+ await putApp({id:uid('application'),company:company.trim(),title:title.trim(),location,salary,employmentType,description,sourceUrl:url,status:'interested',createdAt:new Date().toISOString(),appliedAt:null,notes:''});go('application-detail');}
  return <ScrollView contentContainerStyle={{padding:18,paddingBottom:140,gap:13}}><Heading>Add job</Heading><Txt color={C.muted}>Add manually, or import text from a screenshot. Nothing is submitted to an employer.</Txt>
  <View style={{flexDirection:'row',gap:9}}><View style={{flex:1}}><Primary secondary label="From photo library" onPress={()=>void imageImport()}/></View><View style={{flex:1}}><Primary secondary label="Take photo" onPress={()=>void imageImport(true)}/></View></View>
  {busy&&<View accessibilityRole="progressbar" accessibilityLabel={step} style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:C.pale,borderRadius:16,padding:14}}><ActivityIndicator color={C.blue}/><Txt size={14} style={{flex:1}}>{step}</Txt></View>}
@@ -34,7 +34,7 @@ export function AddJobScreen(){const {putApp,go,takeAddJobIntent}=useBrief();
  {!busy&&aiNote==='missing'&&<View style={{gap:8,backgroundColor:C.pale,borderRadius:16,padding:14}}><Txt size={14}>Text read from your screenshot. On-device AI isn’t set up, so fill in the fields below — the full text is in the description.</Txt><Tap accessibilityRole="button" onPress={()=>go('settings')} style={{alignSelf:'flex-start',minHeight:32,justifyContent:'center'}}><Txt bold size={14} color={C.blue}>Set up on-device AI</Txt></Tap></View>}
  {!busy&&aiNote==='failed'&&<View style={{backgroundColor:C.pale,borderRadius:16,padding:14}}><Txt size={14}>Text read, but the AI couldn’t sort it into fields. Fill them in below — the full text is in the description.</Txt></View>}
  <Card><Field label="Company *" value={company} onChangeText={setCompany} placeholder="e.g. Notion"/><Field label="Position *" value={title} onChangeText={setTitle} placeholder="e.g. Product Manager"/><Field label="Location" value={location} onChangeText={setLocation}/><Field label="Salary (optional)" value={salary} onChangeText={setSalary}/><Field label="Employment type" value={employmentType} onChangeText={setEmploymentType}/><Field label="Source URL (optional)" value={url} onChangeText={setUrl} placeholder="https://..."/><Field label="Job description / original screenshot text" value={description} onChangeText={setDescription} multiline/></Card>
- <Card><Txt bold>Have you applied already?</Txt><View style={{flexDirection:'row',flexWrap:'wrap',gap:8,marginTop:13}}>{(['interested','applied','under_review','interview'] as const).map(s=><Tap key={s} onPress={()=>setStatus(s)} style={{padding:10,backgroundColor:status===s?C.blue:C.pale,borderRadius:17}}><Txt color={status===s?C.white:C.blue} size={12}>{s.replace('_',' ')}</Txt></Tap>)}</View></Card>
- <Primary label="Save to applications" onPress={()=>void save()}/>
+ <Primary label="Add to Brief" onPress={()=>void save()}/>
+ <Txt size={12} color={C.muted} style={{textAlign:'center'}}>You can update its status after adding it.</Txt>
  </ScrollView>;
 }

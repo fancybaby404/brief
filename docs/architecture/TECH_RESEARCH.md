@@ -17,6 +17,9 @@
 - No key for public remote listings, bounded recent publication window, fair-use and rate limits; keep provider canonical URL. Optional original ATS URLs may require paid/commercial API. This is NOT a Philippines-wide job database.
 - Adzuna alternative (requires app_id/app_key, keep keys on backend not shipped in mobile): https://developer.adzuna.com/overview
 
+## Exchange rates
+- Frankfurter (ECB reference rates, ~30 currencies incl. PHP): https://frankfurter.dev — `GET /v1/latest?base=EUR`, no API key. Checked 2026-10-09.
+
 ## Agent skills
 - Matt Pocock engineering skills: https://github.com/mattpocock/skills ; install with skills.sh, select `setup-matt-pocock-skills`, design/tdd/implement/qa workflows. A plugin alternative exists; do not install BOTH plugin and copied skills for the same agent.
 - Ponytail & Caveman: https://github.com/DietrichGebert/ponytail ; installer docs https://github.com/DietrichGebert/ponytail/blob/main/INSTALL.md . Ponytail = simpler code, Caveman = terse explanations.

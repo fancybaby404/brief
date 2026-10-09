@@ -1,7 +1,8 @@
 import React,{useEffect,useState} from 'react';
 import {Alert,ScrollView,Switch,View} from 'react-native';
 import {useBrief} from '../lib/appContext';import {C} from '../theme/tokens';
-import {Card,Field,Heading,Icon,Primary,Txt,Tap} from '../components/Ui';
+import {Card,Field,Heading,Icon,Primary,PullDownMenu,Txt,Tap} from '../components/Ui';
+import {CURRENCIES} from '../lib/currency';
 import {deleteLocalFile,importResume,pickModel} from '../lib/imports';import {benchmarkModel,configureModel,modelPath,releaseModel} from '../lib/ai';
 import * as Sharing from 'expo-sharing';
 import {EmptyState} from '../components/States';
@@ -40,12 +41,19 @@ export function ResumeScreen(){const {profile,updateProfile}=useBrief();const [e
  </ScrollView></LayoutAnimationConfig>;
 }
 export function NotificationsScreen(){const {goTab}=useBrief();return <ScrollView contentContainerStyle={{padding:18,paddingBottom:110,gap:15}}><Heading>Notifications</Heading><EmptyState title="You’re all caught up" body="Brief doesn’t send reminders yet. Your interviews and deadlines are in Calendar." action={{label:'Open Calendar',onPress:()=>goTab('calendar')}}/></ScrollView>}
-export function SettingsScreen(){const {profile,updateProfile,replayOnboarding}=useBrief();const [model,setModel]=useState(''),[busy,setBusy]=useState(''),[name,setName]=useState(profile.name),[result,setResult]=useState('');
+export function SettingsScreen(){const {profile,updateProfile,replayOnboarding,currency,setCurrency,fx,fxError,refreshFx}=useBrief();const [refreshing,setRefreshing]=useState(false);const [model,setModel]=useState(''),[busy,setBusy]=useState(''),[name,setName]=useState(profile.name),[result,setResult]=useState('');
  useEffect(()=>{void modelPath().then(setModel);},[]);
  async function importModel(){setBusy('Importing model… large files can take a minute.');setResult('');try{await releaseModel();const uri=await pickModel();if(!uri)return;await configureModel(uri);setModel(uri);setResult('Model imported. Tap “Test local model” to load it.');}catch(e){Alert.alert('Import failed',(e as Error).message);}finally{setBusy('');}}
  async function testModel(){setBusy('Loading model… 0%');setResult('');try{const r=await benchmarkModel(p=>setBusy(`Loading model… ${Math.round(p)}%`));setResult(`Ready on this device. Load ${(r.loadMs/1000).toFixed(1)} s · ${r.tokensPerSec.toFixed(1)} tokens/s.\nSample: “${r.sample}”`);}catch(e){setResult('');Alert.alert('Model failed',(e as Error).message);}finally{setBusy('');}}
  return <ScrollView contentContainerStyle={{padding:18,paddingBottom:120,gap:18}}><Heading>Settings</Heading>
  <Card><Txt bold>Display name</Txt><Field label="Name" value={name} onChangeText={setName}/><Primary secondary label="Save name" onPress={()=>void updateProfile({...profile,name})}/></Card>
+ <Card style={{gap:10}}>
+  <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10}}><View style={{flex:1}}><Txt bold>Salary currency</Txt><Txt color={C.muted} size={12}>Salaries in other currencies are converted for display.</Txt></View><PullDownMenu label="Salary currency" value={currency} options={CURRENCIES} onChange={c=>void setCurrency(c)}/></View>
+  {currency!=='original'&&<View style={{flexDirection:'row',alignItems:'center',gap:8}}>
+   <Txt size={12} color={fxError&&!fx?C.danger:C.muted} style={{flex:1}}>{fx?`European Central Bank rates from ${fx.rates.date}.${fxError?' Couldn’t update just now.':''}`:fxError||'Getting exchange rates…'}{!fx?' Salaries show as listed until rates arrive.':''}</Txt>
+   <Tap accessibilityRole="button" disabled={refreshing} hitSlop={10} onPress={()=>{setRefreshing(true);void refreshFx().finally(()=>setRefreshing(false));}}><Txt size={13} bold color={C.blue}>{refreshing?'Updating…':'Update'}</Txt></Tap>
+  </View>}
+ </Card>
  <Card><Txt bold>On-device AI model</Txt><Txt color={C.muted} size={12} style={{marginVertical:9}}>{model?'A model is installed on this phone. Test it to check it loads and see how fast it runs.':'No model yet. Download a small GGUF chat model to your phone (for example Qwen3 1.7B, Q4_K_M, about 1.1 GB; or 0.6B for phones with 4 GB RAM or less), check its license, then import it here. Job tracking works without it.'}</Txt><Primary label="Import GGUF model" disabled={!!busy} onPress={()=>void importModel()}/><View style={{height:8}}/><Primary label="Test local model" secondary disabled={!!busy||!model} onPress={()=>void testModel()}/>{!!(busy||result)&&<Txt size={12} color={busy?C.muted:C.green} style={{marginTop:10}}>{busy||result}</Txt>}</Card>
  <Card><Txt bold>Privacy</Txt><Txt color={C.muted} style={{marginTop:8}}>Applications, messages, and profile data are saved in your device's local SQLite database. Discovery requires an internet connection. No account or cloud LLM is configured.</Txt></Card>
  <Card style={{gap:10}}><Txt bold>Welcome tour</Txt><Txt color={C.muted} size={12}>See the introduction again. Your jobs and profile are kept.</Txt><Primary secondary label="Show onboarding again" onPress={()=>void replayOnboarding()}/></Card>

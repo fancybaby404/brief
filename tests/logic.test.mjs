@@ -1,7 +1,7 @@
 // Pure-logic tests. Node 24 strips TS types, so these import src modules directly.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mapJobicyJob, jobsUrl, filterByType, DEFAULT_FILTERS } from '../src/lib/jobs.ts';
+import { mapJobicyJob, jobsUrl, applyFilters, activeFilterCount, DEFAULT_FILTERS } from '../src/lib/jobs.ts';
 import { progressBuckets, filterSortApplications, niceAxis, normalizeApplication } from '../src/lib/tracker.ts';
 import { parseJobExtraction, userContext } from '../src/lib/prompts.ts';
 
@@ -18,13 +18,15 @@ test('maps Jobicy job type arrays to a readable string', () => {
   assert.equal(mapJobicyJob(jobicy).employmentType, 'Full-Time, Contract');
 });
 
-test('maps Jobicy salary fields with currency and period', () => {
+test('maps Jobicy salary fields into structured pay', () => {
   const j = mapJobicyJob({ ...jobicy, salaryMin: 123000, salaryMax: 142375, salaryCurrency: 'EUR', salaryPeriod: 'yearly' });
-  assert.equal(j.salary, '123,000–142,375 EUR / year');
+  assert.deepEqual(j.pay, { min: 123000, max: 142375, currency: 'EUR', period: 'year' });
+  assert.equal(j.salary, '€123,000–142,375 / yr');
 });
 
 test('missing salary stays empty instead of an invented value', () => {
   assert.equal(mapJobicyJob(jobicy).salary, '');
+  assert.equal(mapJobicyJob(jobicy).pay, undefined);
 });
 
 test('keeps canonical Jobicy URL, id, title, company and geography', () => {
@@ -39,18 +41,32 @@ test('keeps the provider company logo and tidies multi-region locations', () => 
   assert.equal(mapJobicyJob({ ...jobicy, companyLogo: undefined }).logo, '');
 });
 
-test('job search defaults to the Philippines and adds keywords', () => {
+test('job search defaults to the Philippines and adds keywords and industry', () => {
   assert.equal(DEFAULT_FILTERS.geo, 'philippines');
   assert.equal(jobsUrl('', DEFAULT_FILTERS), 'https://jobicy.com/api/v2/remote-jobs?count=50&geo=philippines');
   assert.equal(jobsUrl(' ux design ', DEFAULT_FILTERS), 'https://jobicy.com/api/v2/remote-jobs?count=50&geo=philippines&tag=ux%20design');
-  assert.equal(jobsUrl('', { ...DEFAULT_FILTERS, geo: '' }), 'https://jobicy.com/api/v2/remote-jobs?count=50');
+  assert.equal(jobsUrl('', { ...DEFAULT_FILTERS, geo: '', industry: 'engineering' }), 'https://jobicy.com/api/v2/remote-jobs?count=50&industry=engineering');
 });
 
-test('job type filter matches any listed type, empty means all', () => {
-  const jobs = [mapJobicyJob(jobicy), mapJobicyJob({ ...jobicy, id: 2, jobType: ['Part-Time'] })];
-  assert.equal(filterByType(jobs, '').length, 2);
-  assert.deepEqual(filterByType(jobs, 'Contract').map(j => j.id), ['152819']);
-  assert.deepEqual(filterByType(jobs, 'Part-Time').map(j => j.id), ['2']);
+test('on-device filters: type, experience ("Any" level matches all), salary listed, posted within', () => {
+  const now = new Date('2026-10-09T12:00:00Z').getTime();
+  const jobs = [
+    mapJobicyJob({ ...jobicy, id: 1, jobType: ['Full-Time'], jobLevel: 'Senior', pubDate: '2026-10-09T02:00:00+00:00', salaryMin: 100, salaryCurrency: 'USD', salaryPeriod: 'hourly' }),
+    mapJobicyJob({ ...jobicy, id: 2, jobType: ['Part-Time'], jobLevel: 'Any', pubDate: '2026-10-05T00:00:00+00:00' }),
+    mapJobicyJob({ ...jobicy, id: 3, jobType: ['Contract'], jobLevel: 'Entry-Level, Junior', pubDate: '2026-09-20T00:00:00+00:00' }),
+  ];
+  const ids = f => applyFilters(jobs, { ...DEFAULT_FILTERS, ...f }, now).map(j => j.id);
+  assert.deepEqual(ids({}), ['1', '2', '3']);
+  assert.deepEqual(ids({ type: 'Part-Time' }), ['2']);
+  assert.deepEqual(ids({ level: 'Senior' }), ['1', '2']);
+  assert.deepEqual(ids({ salaryOnly: true }), ['1']);
+  assert.deepEqual(ids({ posted: 1 }), ['1']);
+  assert.deepEqual(ids({ posted: 7 }), ['1', '2']);
+});
+
+test('activeFilterCount counts changes from the defaults', () => {
+  assert.equal(activeFilterCount(DEFAULT_FILTERS), 0);
+  assert.equal(activeFilterCount({ ...DEFAULT_FILTERS, geo: 'apac', salaryOnly: true, posted: 3 }), 3);
 });
 
 const app = (over) => ({ id: 'a', company: 'Acme', title: 'Dev', status: 'interested', location: '', salary: '', employmentType: '', description: '', sourceUrl: '', createdAt: '2026-10-01T00:00:00.000Z', appliedAt: null, notes: '', ...over });
@@ -142,6 +158,8 @@ test('niceAxis picks round gridlines with the top at or above the max', () => {
 
 test('Jobicy industry and seniority become tags; "Any" level is skipped', () => {
   assert.deepEqual(mapJobicyJob({ ...jobicy, jobIndustry: ['Customer Support & Success'], jobLevel: 'Midweight' }).tags, ['Customer Support & Success', 'Mid-level']);
+  assert.equal(mapJobicyJob({ ...jobicy, jobLevel: 'Midweight' }).level, 'Mid-level');
+  assert.equal(mapJobicyJob(jobicy).postedAt, '2026-10-09T02:55:10+00:00');
   assert.deepEqual(mapJobicyJob({ ...jobicy, jobLevel: 'Entry-Level, Junior' }).tags, ['Engineering', 'Entry-level']);
   assert.deepEqual(mapJobicyJob({ ...jobicy, jobLevel: 'Any' }).tags, ['Engineering']);
   assert.deepEqual(mapJobicyJob({ ...jobicy, jobIndustry: undefined, jobLevel: undefined }).tags, []);

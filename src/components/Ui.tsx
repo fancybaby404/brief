@@ -1,11 +1,11 @@
 import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import { AccessibilityInfo, Animated, Dimensions, Easing, Image, Modal, Pressable, Text, TextInput, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, Animated, Dimensions, Easing, Image, Modal, Pressable, ScrollView, Text, TextInput, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 import Reanimated,{ Extrapolation, FadeIn, FadeOut, interpolate, useAnimatedStyle, useReducedMotion as useReanimatedReducedMotion, useSharedValue, withSpring, withTiming, type EntryExitAnimationFunction } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardEvents } from 'react-native-keyboard-controller';
 import { scheduleOnRN } from 'react-native-worklets';
 import { EASE_OUT, EASE_OUT_CSS, EASE_SHEET, SPRING_SHEET, project, rubberband } from '../theme/motion';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { C,R,SPRING } from '../theme/tokens';
@@ -81,8 +81,8 @@ export function CloudHalo({size,children}:{size:number,children:React.ReactNode}
 
 /** Bottom sheet: dims the screen, springs up from the bottom, drag down or tap outside to dismiss.
  *  Reduce Motion swaps the slide for a short cross-fade. */
-export function Sheet({visible,onClose,title,children}:{visible:boolean,onClose:()=>void,title:string,children:React.ReactNode}) {
- const H=Dimensions.get('window').height;const reduce=useReducedMotion();const insets=useSafeAreaInsets();
+export function Sheet({visible,onClose,title,children,footer,scroll=false}:{visible:boolean,onClose:()=>void,title:string,children:React.ReactNode,footer?:React.ReactNode,scroll?:boolean}) {
+ const H=Dimensions.get('window').height;const reduce=useReducedMotion();
  const [mounted,setMounted]=useState(visible);
  const close=useRef(onClose);close.current=onClose;const callClose=useCallback(()=>close.current(),[]);
  // y: sheet offset from its resting position (UI thread). height: measured panel height for the dismiss threshold.
@@ -107,16 +107,24 @@ export function Sheet({visible,onClose,title,children}:{visible:boolean,onClose:
  const backdrop=useAnimatedStyle(()=>({opacity:fade.get()*interpolate(y.get(),[0,height.get()],[1,0],Extrapolation.CLAMP)}));
  const panel=useAnimatedStyle(()=>({opacity:fade.get(),transform:[{translateY:y.get()}]}));
  if(!mounted)return null;
- return <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={onClose}>
+ const header=<View collapsable={false}>
+  <View style={{alignSelf:'center',width:38,height:5,borderRadius:3,backgroundColor:C.line,marginBottom:12}}/>
+  <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><Txt bold size={18}>{title}</Txt><Tap accessibilityRole="button" accessibilityLabel="Close" hitSlop={14} onPress={onClose} style={{width:30,height:30,borderRadius:15,backgroundColor:C.pale2,alignItems:'center',justifyContent:'center'}}><Icon name="close" size={17} color={C.muted}/></Tap></View>
+ </View>;
+ // Long content scrolls; then only the grabber/header drags the sheet, so scrolling never fights dismissal.
+ const body=scroll?<ScrollView style={{maxHeight:H*0.58}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">{children}</ScrollView>:children;
+ const content=<SafeAreaView edges={['bottom']} style={{paddingHorizontal:18,paddingTop:8,paddingBottom:12}}>
+  {scroll?<GestureDetector gesture={pan}>{header}</GestureDetector>:header}
+  {body}
+  {footer&&<View style={{paddingTop:14}}>{footer}</View>}
+ </SafeAreaView>;
+ // The modal draws edge to edge on purpose; the SafeAreaView measures the real bottom inset (home indicator / Android nav bar).
+ return <Modal transparent visible animationType="none" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
  <GestureHandlerRootView style={{flex:1}}>
  <Reanimated.View style={[{flex:1,backgroundColor:'rgba(9,25,45,0.3)'},backdrop]}><Pressable accessibilityRole="button" accessibilityLabel="Close" style={{flex:1}} onPress={onClose}/></Reanimated.View>
- <GestureDetector gesture={pan}>
- <Reanimated.View accessibilityViewIsModal onLayout={e=>height.set(e.nativeEvent.layout.height)} style={[{position:'absolute',left:0,right:0,bottom:0,backgroundColor:C.white,borderTopLeftRadius:24,borderTopRightRadius:24,padding:18,paddingTop:8,paddingBottom:Math.max(insets.bottom,16)+4,shadowColor:'#33446A',shadowOpacity:0.15,shadowRadius:20,elevation:16},panel]}>
- <View style={{alignSelf:'center',width:38,height:5,borderRadius:3,backgroundColor:C.line,marginBottom:12}}/>
- <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:10}}><Txt bold size={18}>{title}</Txt><Tap accessibilityRole="button" accessibilityLabel="Close" hitSlop={14} onPress={onClose} style={{width:30,height:30,borderRadius:15,backgroundColor:C.pale2,alignItems:'center',justifyContent:'center'}}><Icon name="close" size={17} color={C.muted}/></Tap></View>
- {children}
+ <Reanimated.View accessibilityViewIsModal onLayout={e=>height.set(e.nativeEvent.layout.height)} style={[{position:'absolute',left:0,right:0,bottom:0,backgroundColor:C.white,borderTopLeftRadius:24,borderTopRightRadius:24,shadowColor:'#33446A',shadowOpacity:0.15,shadowRadius:20,elevation:16},panel]}>
+  {scroll?content:<GestureDetector gesture={pan}>{content}</GestureDetector>}
  </Reanimated.View>
- </GestureDetector>
  </GestureHandlerRootView>
  </Modal>;
 }

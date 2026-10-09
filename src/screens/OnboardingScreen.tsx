@@ -1,15 +1,13 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {ActivityIndicator,Alert,BackHandler,ScrollView,Switch,Text,View,useWindowDimensions,type DimensionValue} from 'react-native';
+import {BackHandler,ScrollView,Text,View,useWindowDimensions,type DimensionValue} from 'react-native';
 import Reanimated,{Extrapolation,FadeIn,interpolate,useAnimatedRef,useAnimatedScrollHandler,useAnimatedStyle,useSharedValue,withDelay,withSpring,withTiming,type EntryExitAnimationFunction,type SharedValue} from 'react-native-reanimated';
 import {EASE_OUT,SPRING_SETTLE} from '../theme/motion';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {useBrief,type AddJobIntent} from '../lib/appContext';
+import {useBrief} from '../lib/appContext';
 import {C} from '../theme/tokens';
 import {CloudHalo,CompanyLogo,Icon,Mascot,Primary,Sparkles,Tap,Txt,Wordmark,useReducedMotion} from '../components/Ui';
-import {ProfileForm} from '../components/ProfileForm';
 import {LiveMascot} from '../components/LiveMascot';
 import {TypingDots} from '../components/States';
-import {importResume} from '../lib/imports';
 import {hasProfileDetails,listItems} from '../lib/profile';
 import type {Profile} from '../types';
 
@@ -114,28 +112,15 @@ function PageDots({x,width,index}:{x:SharedValue<number>,width:number,index:numb
 /** First-launch onboarding: four swipeable pages. Everything entered here is saved to the local profile
  *  immediately; Skip / Get started set the `onboarded` pref so it never shows again. */
 export function OnboardingScreen(){
- const {profile,updateProfile,finishOnboarding,openAddJob}=useBrief();
+ const {profile,finishOnboarding}=useBrief();
  const {width}=useWindowDimensions();const insets=useSafeAreaInsets();const reduce=useReducedMotion();
  const pager=useAnimatedRef<Reanimated.ScrollView>();const x=useSharedValue(0);
  const onScroll=useAnimatedScrollHandler(e=>{x.set(e.contentOffset.x);});
- const [index,setIndex]=useState(0),[editing,setEditing]=useState(false),[busy,setBusy]=useState(false);
+ const [index,setIndex]=useState(0);
  const goTo=(i:number)=>{setIndex(i);pager.current?.scrollTo({x:i*width,animated:!reduce});};
  useEffect(()=>{const s=BackHandler.addEventListener('hardwareBackPress',()=>{if(index>0){goTo(index-1);return true;}return false;});return ()=>s.remove();},[index,width]);
  const last=index===PAGES-1;
- const startAddJob=(intent:AddJobIntent)=>{void finishOnboarding().then(()=>openAddJob(intent));};
-
- async function upload(){
-  setBusy(true);
-  try{
-   const r=await importResume(profile.resumeUri);if(!r)return;
-   await updateProfile({...profile,resumeUri:r.resumeUri,resumeText:r.resumeText,useResumeForAI:true});
-   if(r.note)Alert.alert('Resume added',`${r.note} Add a few details so Brief can use them.`,[{text:'Later',style:'cancel'},{text:'Enter details',onPress:()=>setEditing(true)}]);
-  }catch(e){Alert.alert('Couldn’t add resume',(e as Error).message);}
-  finally{setBusy(false);}
- }
-
  const page=(i:number,content:React.ReactNode)=><ScrollView key={i} style={{width}} showsVerticalScrollIndicator={false} contentContainerStyle={{flexGrow:1,paddingHorizontal:24,paddingTop:16,paddingBottom:12,gap:16}}>{content}</ScrollView>;
- const hasDetails=hasProfileDetails(profile)||!!profile.name;
 
  return <View style={{flex:1}}>
  <Reanimated.ScrollView ref={pager} horizontal pagingEnabled bounces={false} showsHorizontalScrollIndicator={false} scrollEventThrottle={16}
@@ -147,25 +132,16 @@ export function OnboardingScreen(){
    <Lead>Save job posts from anywhere and keep track of your applications in one place.</Lead>
    <Parallax x={x} i={1} width={width}><JobCardArt/></Parallax>
    <Rows rows={[
-    {icon:'image-outline',title:'Import screenshot',sub:'Grab job posts from anywhere',onPress:()=>startAddJob('library')},
-    {icon:'camera-outline',title:'Take a photo',sub:'Snap and save job details',onPress:()=>startAddJob('camera')},
-    {icon:'document-text-outline',title:'Add manually',sub:'Enter the details yourself',onPress:()=>startAddJob('manual')},
+    {icon:'image-outline',title:'Import screenshot',sub:'Grab job posts from anywhere'},
+    {icon:'camera-outline',title:'Take a photo',sub:'Snap and save job details'},
+    {icon:'document-text-outline',title:'Add manually',sub:'Enter the details yourself'},
    ]}/>
   </>)}
   {page(2,<>
    <Headline a="Make Brief smarter" b="with your resume."/>
    <Lead>Your resume helps Brief give you personalized interview practice, job-specific advice, and smarter suggestions.</Lead>
    <Parallax x={x} i={2} width={width}><ResumeArt p={profile}/></Parallax>
-   <View style={{flexDirection:'row',gap:10}}>
-    {([[profile.resumeUri?'refresh-outline':'cloud-upload-outline',profile.resumeUri?'Replace resume':'Upload resume',()=>void upload()],['create-outline',hasDetails?'Edit details':'Enter manually',()=>setEditing(true)]] as const).map(([icon,label,onPress])=>
-     <Tap key={label} accessibilityRole="button" disabled={busy} onPress={onPress} style={{flex:1,minHeight:48,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7,borderRadius:14,backgroundColor:C.pale}}>
-      {busy&&label.includes('resume')?<ActivityIndicator color={C.blue}/>:<Icon name={icon} size={18} color={C.blue}/>}<Txt bold size={14} color={C.blue}>{label}</Txt></Tap>)}
-   </View>
-   <View style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:C.white,borderRadius:18,borderWidth:1,borderColor:C.line,padding:14}}>
-    <Icon name="sparkles-outline" size={22} color={C.blue}/>
-    <View style={{flex:1}}><Txt bold size={15}>AI personalization</Txt><Txt size={13} color={C.muted}>Use my resume to improve interviews and job guidance</Txt></View>
-    <Switch accessibilityLabel="Use my resume for AI personalization" value={profile.useResumeForAI} onValueChange={v=>void updateProfile({...profile,useResumeForAI:v})} trackColor={{true:C.blue,false:C.line}} thumbColor={C.white} ios_backgroundColor={C.line}/>
-   </View>
+   <Txt size={13} color={C.muted} style={{textAlign:'center'}}>Add your resume anytime from Resume in the profile menu.</Txt>
   </>)}
   {page(3,<>
    <Headline a="Practice with" b="Local AI."/>
@@ -184,6 +160,5 @@ export function OnboardingScreen(){
   <Primary large icon="chevron-forward" label={last?'Get started':'Continue'} onPress={()=>last?void finishOnboarding():goTo(index+1)}/>
   <Tap accessibilityRole="button" onPress={()=>last?goTo(index-1):void finishOnboarding()} style={{alignSelf:'center',minHeight:44,minWidth:88,alignItems:'center',justifyContent:'center'}}><Txt size={15} color={C.muted}>{last?'Back':'Skip'}</Txt></Tap>
  </View>
- <ProfileForm visible={editing} profile={profile} onClose={()=>setEditing(false)} onSave={d=>{setEditing(false);void updateProfile({...profile,...d});}}/>
  </View>;
 }

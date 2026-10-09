@@ -78,6 +78,13 @@
 - Fixes: chart no longer re-animates on every Home visit; Reduce Motion correct on first frame; keyboard "will" events; haptics only for meaningful commits.
 - Verified: typecheck, 38 tests, expo-doctor 21/21, Android bundle with 24 compiled worklets. **Feel not yet verified on device.**
 
+### 2026-10-09 — feedback: onboarding, sheets, filters, currency, status
+- Onboarding is a tour: page 2 rows and page 3 resume preview are informational (no chevrons, buttons, or AI toggle); resume is added later from Resume.
+- Sheet safe area: modal is edge-to-edge (`navigationBarTranslucent`) and a native `SafeAreaView` measures the bottom inset (Android nav bar / home indicator). New `scroll` mode (header-only drag) and pinned `footer`.
+- Explore filters: location, industry (22 Jobicy industries, API), job type incl. internship, experience ("Any"-level jobs match every level), posted within, salary listed — tested; count badge on the filter button.
+- Currency: `lib/currency.ts` (tested) + `lib/rates.ts`; Settings → Salary currency; salaries show "≈ ₱7.6M–10.1M / yr" with "Listed as …" on the job page.
+- "Add to Brief" is the only add action (bookmark, swipe, button, Add Job); confirmation toast replaces the system alert; `StatusTracker` (Interested → Applied → In review → Interview → Offer, plus reversible Not selected) replaces the status chips.
+
 ## Next tasks in order
 1. **P0**: `scripts/setup.sh` + `npm run typecheck` + Android dev build; fix dependency APIs, permissions, runtime import errors, SafeArea/keyboard collisions, design bugs.
 2. **P0**: import/test Qwen Q4 GGUF on actual target phone; run airplane-mode chat and mock; reduce prompt/context memory footprint as needed.

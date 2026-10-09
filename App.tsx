@@ -7,7 +7,7 @@ import {useFonts} from 'expo-font';
 import {Fredoka_700Bold} from '@expo-google-fonts/fredoka/700Bold';
 import {BriefProvider,useBrief} from './src/lib/appContext';
 import {C} from './src/theme/tokens';
-import {Header,FloatingNav,Overlays} from './src/components/Chrome';
+import {Header,FloatingNav,Overlays,ToastHost} from './src/components/Chrome';
 import {HomeScreen} from './src/screens/HomeScreen';
 import {ApplicationsScreen} from './src/screens/ApplicationsScreen';
 import {JobsScreen,JobDetailScreen} from './src/screens/JobsScreen';
@@ -35,6 +35,7 @@ function Shell(){const {page,ready,storageError,retryStorage}=useBrief();
  {jobsVisited.current&&<View style={{flex:1,display:page==='jobs'?'flex':'none'}}><JobsScreen/></View>}
  {page!=='jobs'&&<View style={{flex:1}}>{screens[page]}</View>}
  {page!=='onboarding'&&<FloatingNav/>}
+ <ToastHost/>
  <Overlays/>
  </>}
  </SafeAreaView>;

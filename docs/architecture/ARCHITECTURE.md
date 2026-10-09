@@ -37,6 +37,9 @@ DocumentPicker -> file copied into private app documents -> locally extract nati
 ## Real job discovery
 Jobicy endpoint `https://jobicy.com/api/v2/remote-jobs?count=40&tag=...`. No API key but last-7-day remote-job scope and rate limits. Keep canonical source URL. Filter by eligible location using provider data when needed; don't fabricate geography, employer logo, salary, or "verified" status. Later add licensed Philippines provider as separate adapter.
 
+## Exchange rates
+Salary display can convert provider salaries (structured `pay`: min, max, currency, period) into the user's chosen currency (Settings, default PHP; "As listed" turns it off). Rates are ECB reference rates from `https://api.frankfurter.dev/v1/latest?base=EUR` (no key). The request carries no user data; results are cached in SQLite (`fxRates`) and refreshed when older than 12 h, so conversion works offline with the last rates. Converted values are prefixed "≈"; manual salaries are shown as typed.
+
 ## Security / offline
 - Airplane mode must not block SQLite, imported OCR photos, current profile and local chat/mock (once model installed).
 - Job discovery is explicit online-only; no cached search results promised unless implemented.
