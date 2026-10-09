@@ -1,7 +1,9 @@
 import type { Application, ApplicationStatus } from '../types';
 
-export const STATUS_ORDER: ApplicationStatus[] = ['saved', 'interested', 'applied', 'under_review', 'interview', 'offer', 'rejected'];
-export const isApplied = (a: Application) => a.status !== 'saved' && a.status !== 'interested';
+export const STATUS_ORDER: ApplicationStatus[] = ['interested', 'applied', 'under_review', 'interview', 'offer', 'rejected'];
+export const isApplied = (a: Application) => a.status !== 'interested';
+/** Rows saved before 'saved' merged into 'interested' load as 'interested'. */
+export const normalizeApplication = (a: Application): Application => ((a.status as string) === 'saved' ? { ...a, status: 'interested' } : a);
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const WEEK = 7 * 86400000;

@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mapJobicyJob, jobsUrl, filterByType, DEFAULT_FILTERS } from '../src/lib/jobs.ts';
-import { progressBuckets, filterSortApplications, niceAxis } from '../src/lib/tracker.ts';
+import { progressBuckets, filterSortApplications, niceAxis, normalizeApplication } from '../src/lib/tracker.ts';
 import { parseJobExtraction, userContext } from '../src/lib/prompts.ts';
 
 // Shape captured from the live Jobicy v2 API on 2026-10-09.
@@ -53,7 +53,7 @@ test('job type filter matches any listed type, empty means all', () => {
   assert.deepEqual(filterByType(jobs, 'Part-Time').map(j => j.id), ['2']);
 });
 
-const app = (over) => ({ id: 'a', company: 'Acme', title: 'Dev', status: 'saved', location: '', salary: '', employmentType: '', description: '', sourceUrl: '', createdAt: '2026-10-01T00:00:00.000Z', appliedAt: null, notes: '', ...over });
+const app = (over) => ({ id: 'a', company: 'Acme', title: 'Dev', status: 'interested', location: '', salary: '', employmentType: '', description: '', sourceUrl: '', createdAt: '2026-10-01T00:00:00.000Z', appliedAt: null, notes: '', ...over });
 
 test('progress buckets count applied-or-later apps per rolling week, oldest first', () => {
   const now = new Date('2026-10-29T12:00:00Z').getTime();
@@ -61,8 +61,7 @@ test('progress buckets count applied-or-later apps per rolling week, oldest firs
     app({ id: '1', status: 'applied', appliedAt: '2026-10-28T00:00:00Z' }), // this week
     app({ id: '2', status: 'interview', appliedAt: '2026-10-27T00:00:00Z' }), // this week
     app({ id: '3', status: 'applied', appliedAt: '2026-10-10T00:00:00Z' }), // 2-3 weeks ago
-    app({ id: '4', status: 'saved', createdAt: '2026-10-28T00:00:00Z' }), // not applied: excluded
-    app({ id: '5', status: 'interested', createdAt: '2026-10-28T00:00:00Z' }), // excluded
+    app({ id: '5', status: 'interested', createdAt: '2026-10-28T00:00:00Z' }), // not applied: excluded
     app({ id: '6', status: 'applied', appliedAt: '2026-09-01T00:00:00Z' }), // older than 4 weeks
   ];
   assert.deepEqual(progressBuckets(apps, now).map(b => b.count), [0, 1, 0, 2]);
@@ -75,7 +74,7 @@ test('progress buckets label each week by its start date', () => {
 
 test('filterSortApplications searches company+title and sorts', () => {
   const apps = [
-    app({ id: '1', company: 'Zeta', title: 'Designer', status: 'saved', createdAt: '2026-10-03T00:00:00Z' }),
+    app({ id: '1', company: 'Zeta', title: 'Designer', status: 'interested', createdAt: '2026-10-03T00:00:00Z' }),
     app({ id: '2', company: 'Acme', title: 'Engineer', status: 'applied', createdAt: '2026-10-01T00:00:00Z' }),
     app({ id: '3', company: 'Mid', title: 'Engineer II', status: 'interview', createdAt: '2026-10-02T00:00:00Z' }),
   ];
@@ -84,7 +83,7 @@ test('filterSortApplications searches company+title and sorts', () => {
   assert.deepEqual(filterSortApplications(apps, '', 'company').map(a => a.id), ['2', '3', '1']);
   assert.deepEqual(filterSortApplications(apps, 'engineer', 'newest').map(a => a.id), ['3', '2']);
   // status sorts by pipeline order, not alphabetically
-  assert.deepEqual(filterSortApplications(apps, '', 'status').map(a => a.status), ['saved', 'applied', 'interview']);
+  assert.deepEqual(filterSortApplications(apps, '', 'status').map(a => a.status), ['interested', 'applied', 'interview']);
 });
 
 test('parseJobExtraction reads the JSON object and drops unknown keys', () => {
@@ -139,4 +138,16 @@ test('niceAxis picks round gridlines with the top at or above the max', () => {
   assert.deepEqual(niceAxis(2), [0, 1, 2]);
   assert.deepEqual(niceAxis(0), [0, 1, 2, 3]);
   assert.deepEqual(niceAxis(120), [0, 50, 100, 150]);
+});
+
+test('Jobicy industry and seniority become tags; "Any" level is skipped', () => {
+  assert.deepEqual(mapJobicyJob({ ...jobicy, jobIndustry: ['Customer Support & Success'], jobLevel: 'Midweight' }).tags, ['Customer Support & Success', 'Mid-level']);
+  assert.deepEqual(mapJobicyJob({ ...jobicy, jobLevel: 'Entry-Level, Junior' }).tags, ['Engineering', 'Entry-level']);
+  assert.deepEqual(mapJobicyJob({ ...jobicy, jobLevel: 'Any' }).tags, ['Engineering']);
+  assert.deepEqual(mapJobicyJob({ ...jobicy, jobIndustry: undefined, jobLevel: undefined }).tags, []);
+});
+
+test('legacy "saved" applications load as "interested" (the two were merged)', () => {
+  assert.equal(normalizeApplication(app({ status: 'saved' })).status, 'interested');
+  assert.equal(normalizeApplication(app({ status: 'applied' })).status, 'applied');
 });

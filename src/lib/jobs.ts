@@ -12,13 +12,17 @@ function salary(j: any) {
   const period = periods[String(j.salaryPeriod)] ? ` / ${periods[String(j.salaryPeriod)]}` : '';
   return `${range}${j.salaryCurrency ? ' ' + j.salaryCurrency : ''}${period}`;
 }
-const list = (v: unknown) => (Array.isArray(v) ? v : v ? [v] : []).map(String).join(', ');
+const arr = (v: unknown) => (Array.isArray(v) ? v : v ? [v] : []).map(String);
+const list = (v: unknown) => arr(v).join(', ');
+const LEVELS: Record<string, string> = { Midweight: 'Mid-level', 'Entry-Level, Junior': 'Entry-level', 'Entry-Level': 'Entry-level' };
 
 export function mapJobicyJob(j: any): RemoteJob {
   return {
     id: String(j.id), company: j.companyName || 'Company not listed', title: j.jobTitle || 'Untitled role',
     location: String(j.jobGeo || 'Remote').replace(/\s*,\s*/g, ', '), salary: salary(j), employmentType: list(j.jobType),
     description: htmlToText(j.jobDescription || ''), url: j.url || '', logo: j.companyLogo || '',
+    // Chips: industry + seniority as the provider states them ("Any" level says nothing).
+    tags: [...arr(j.jobIndustry), j.jobLevel && j.jobLevel !== 'Any' ? LEVELS[j.jobLevel] || String(j.jobLevel) : ''].filter(Boolean),
   };
 }
 

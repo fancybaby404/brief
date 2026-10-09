@@ -48,6 +48,11 @@
 - Range pull-down (`PullDownMenu`, anchored under the pill, leading checkmark, selection haptic): Last 4 weeks (weekly), Last 8 weeks (weekly, alternate labels), Last 6 months (calendar months). Counts are applications the user reported as applied or later, by `appliedAt`.
 - `Popover` moved to `Ui.tsx` and shared by the + menu, profile menu and pull-downs.
 
+### 2026-10-09 — Explore cards, swipe to Interested, Saved merged into Interested
+- **Cards:** logo, title, company, location • type, bookmark top-right (status pill instead once past Interested, so a stray tap can't delete an applied job), salary with icon when listed, chips from Jobicy `jobIndustry` + `jobLevel` (Midweight→Mid-level, "Any" omitted). Detail page shows all chips.
+- **Swipe left** (`SwipeAction`, PanResponder + native-driver springs, no new native deps): 1:1 tracking, rubber-band past 88 px, haptic tick on crossing the threshold, flick commits, springs home with release velocity, only claims clearly horizontal drags. Already-tracked jobs reveal "In Brief" and don't re-commit. Also exposed as an accessibility action + bookmark button. One-time hint until the first Explore job is tracked.
+- **Status merge:** `saved` removed from `ApplicationStatus`; old rows load as `interested` (`normalizeApplication` in `db.listApplications`). Job detail sheet offers Interested or Applied; Add Job defaults to Interested. Un-bookmarking an Interested job removes it (confirms first if it has notes). Specs updated (SCREEN_INVENTORY, USER_JOURNEYS, ACCEPTANCE_TESTS).
+
 ## Next tasks in order
 1. **P0**: `scripts/setup.sh` + `npm run typecheck` + Android dev build; fix dependency APIs, permissions, runtime import errors, SafeArea/keyboard collisions, design bugs.
 2. **P0**: import/test Qwen Q4 GGUF on actual target phone; run airplane-mode chat and mock; reduce prompt/context memory footprint as needed.

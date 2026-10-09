@@ -6,7 +6,7 @@ import type { Application,Event,Profile,RemoteJob,Page,Tab } from '../types';
 type AppState={
  page:Page;tab:Tab;go:(p:Page)=>void;goTab:(t:Tab)=>void;back:()=>void;
  applications:Application[];events:Event[];profile:Profile;updateProfile:(p:Profile)=>Promise<void>;
- putApp:(a:Application)=>Promise<void>;removeApp:(id:string)=>Promise<void>;
+ putApp:(a:Application)=>Promise<void>;removeApp:(id:string,navigate?:boolean)=>Promise<void>;
  putEvent:(e:Event)=>Promise<void>;removeEvent:(id:string)=>Promise<void>;
  selectedApp:Application|null;openApp:(a:Application)=>void;selectedJob:RemoteJob|null;openJob:(j:RemoteJob)=>void;
  chatJob:Application|null;openChat:(job?:Application|null)=>void;
@@ -27,7 +27,7 @@ export function BriefProvider({children}:{children:React.ReactNode}) {
  const goTab=(t:Tab)=>{setTab(t);go(t);};
  const back=()=>go(tab);
  const putApp=async(a:Application)=>{await DB.saveApplication(a);void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);setApplications(old=>[a,...old.filter(x=>x.id!==a.id)]);setSelectedApp(a);};
- const removeApp=async(id:string)=>{await DB.deleteApplication(id);setApplications(old=>old.filter(x=>x.id!==id));go('applications');};
+ const removeApp=async(id:string,navigate=true)=>{await DB.deleteApplication(id);setApplications(old=>old.filter(x=>x.id!==id));if(navigate)go('applications');};
  const putEvent=async(e:Event)=>{await DB.saveEvent(e);setEvents(old=>[e,...old.filter(x=>x.id!==e.id)]);};
  const removeEvent=async(id:string)=>{await DB.deleteEvent(id);setEvents(old=>old.filter(x=>x.id!==id));};
  const updateProfile=async(p:Profile)=>{await DB.saveProfile(p);setProfile(p);};
