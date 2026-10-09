@@ -22,6 +22,12 @@
 2. **Ask Brief**: local career coach, grounded in selected job (if any), up to 7 saved job snippets, optional candidate profile and extracted text, recent messages. Respond briefly, identify risk indicators with quotes from source where possible. Generate follow-up question suggestions on-device from the current conversation; never show static suggestions when the model is missing.
 3. **Mock**: take job description and candidate profile as context, role-play reasonable interviewer (not affiliated with real company). Ask exactly one question per turn, adapt follow-up, finish with action-oriented feedback tied to user's statements.
 
+## Agent (Ask Brief actions)
+- Rules first, model second: deterministic intent rules handle common phrasings; only unrecognised action-like messages go to a schema-constrained router call. Invalid router output = plain chat.
+- The model never supplies record IDs or executes anything. Writes are proposals shown as cards; the app validates, asks for confirmation, executes once, re-reads storage, then reports (with Undo for deletes).
+- Images: Qwen3-VL reads the image directly; native OCR text, when available, is a second fenced source. Extracted fields are schema-validated and shown for editing before anything is saved.
+- Details and test status: `LOCAL_AI_AGENTIC_VERIFICATION.md`.
+
 ## Availability UX
 Missing model => direct text: "Install a local model in Settings" and link; no mock AI reply. Invalid model => actionable error and retry. Successful load => ready signal. On import, reflect actual copy/model init progress, especially for 1GB files. OCR should still function without AI via manual review.
 

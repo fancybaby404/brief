@@ -58,13 +58,14 @@ const MESSAGE_FADE=FadeIn.duration(150).easing(EASE_OUT);
 const THINK_IN=FadeIn.duration(150).easing(EASE_OUT),THINK_OUT=FadeOut.duration(120).easing(EASE_OUT);
 
 /** One chat / mock message. `animate` only for messages created while the screen is open. */
-export function MessageBubble({role,text,imageUri,animate,avatar=31}:{role:'user'|'assistant',text:string,imageUri?:string,animate:boolean,avatar?:number}){
+/** Memoized: streaming and new messages don't re-render the bubbles already on screen. */
+export const MessageBubble=React.memo(function MessageBubble({role,text,imageUri,animate,avatar=31}:{role:'user'|'assistant',text:string,imageUri?:string,animate:boolean,avatar?:number}){
  const reduce=useReducedMotion();const mine=role==='user';
  return <Reanimated.View entering={animate?(reduce?MESSAGE_FADE:MESSAGE_IN):undefined} style={{maxWidth:'88%',alignSelf:mine?'flex-end':'flex-start',flexDirection:'row',alignItems:'flex-end',gap:7}}>
  {!mine&&<Mascot size={avatar}/>}
  <View style={{backgroundColor:mine?C.blue:C.pale,padding:13,borderRadius:18,flexShrink:1,gap:imageUri&&text?8:0}}>{!!imageUri&&<Image source={{uri:imageUri}} accessibilityLabel="Attached image" resizeMode="cover" style={{width:190,height:130,borderRadius:11}}/>}{!!text&&<Txt selectable color={mine?C.white:C.ink}>{text}</Txt>}</View>
  </Reanimated.View>;
-}
+});
 
 /** Shown in the conversation while the on-device model is generating. */
 export function ThinkingBubble(){

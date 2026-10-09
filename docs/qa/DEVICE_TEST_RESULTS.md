@@ -24,8 +24,13 @@ Gates from `ACCEPTANCE_TESTS.md`. PASS needs evidence; BLOCKED names what is mis
 | No network inference in offline flows | BLOCKED | Needs device traffic capture |
 | No secrets/resume/GGUF in git | PASS (2026-10-09) | `.gitignore` covers `*.gguf`, `.env`, keystores; `git status` reviewed before commit |
 
+## 2026-10-10 — application detail redesign (desktop gates only)
+- `npm run typecheck` PASS; `npx expo-doctor` 21/21 PASS; `npx expo export --platform android` PASS (3.9 MB Hermes bundle); `npm test` 57/58 — the one failure (`repo.test.mjs` expects the string `add-job` in `App.tsx`) predates this change.
+- Not run on a device or simulator. **A new development build is required**: `expo-notifications` and `@react-native-community/datetimepicker` are new native modules, and builds without them crash on the event editor import.
+- Device checks for this screen: status sheet drag/dismiss; event sheet keyboard (title, location, notes) on iOS page sheet and Android full screen; iOS compact date/time pickers and Android dialogs (12/24 h); reminder permission prompt, denial path and a reminder actually firing (foreground and locked); notes autosave across swipe-down, Done, Android back and app switch; Back from Ask Brief / Practice returns to the job; compact title fade on scroll; long company names and titles; large Dynamic Type; VoiceOver/TalkBack labels.
+
 ## Known issues to check on device
-- **Use build d0b5c757 or later.** Builds before it lack Reanimated / Gesture Handler / Keyboard Controller and crash with the current JS.
+- **Use a build made after the voice work (2026-10-10)**: adds expo-notifications, datetimepicker, expo-asset, whisper.rn, audio-pcm-stream, expo-speech and expo-image-manipulator. Offline runs still to do: `LOCAL_AI_AGENTIC_VERIFICATION.md` §9 and `MULTIMODAL_AI_VOICE_VERIFICATION.md` §11. The agent/vision offline run in `LOCAL_AI_AGENTIC_VERIFICATION.md` §9 is still to do. Builds before d0b5c757 also lack Reanimated / Gesture Handler / Keyboard Controller.
 - Feel-check on the slowest phone: flick the save/filter sheet down fast and slow, grab it mid-close; swipe a job left slowly past the threshold and back (haptic should tick both ways), then flick; scroll Explore vertically to confirm swipes never steal the scroll; open/close the + and profile menus rapidly; swipe calendar months.
 - Keyboard: composers rely on `KeyboardAvoidingView behavior="padding"` with offset `insets.top + 59` (header height). Verify on Android edge-to-edge and iOS.
 - Jobicy `count=40` with no pagination yet (`nextCursor` is available).

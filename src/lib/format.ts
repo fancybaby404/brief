@@ -60,6 +60,30 @@ export function blocksToText(blocks: Block[]) {
   }).join('');
 }
 
+const DUTIES = /responsib|duties|what you('ll| will) do|day[- ]to[- ]day|the role|your role|you will/i;
+const NEEDS = /requir|qualif|skills|experience|what you('ll| will)? (need|bring|have)|about you|must[- ]have|who you are|you have/i;
+export type JobSummary = { overview: string; highlights: { title: string; items: string[]; more: number }[] };
+/** A skimmable view of a description: the first paragraphs as an overview, then the responsibilities and
+ *  requirements sections (first few bullets) when the description actually has them. Nothing is invented. */
+export function jobSummary(text: string, maxItems = 4, overviewBudget = 360): JobSummary {
+  const blocks = textToBlocks(text);
+  const overview: string[] = [];
+  for (const b of blocks) {
+    if (b.type !== 'paragraph') { if (overview.length) break; continue; }
+    if (overview.length && overview.join(' ').length + b.text.length > overviewBudget) break;
+    overview.push(b.text);
+  }
+  const highlights: JobSummary['highlights'] = [];
+  for (const pattern of [DUTIES, NEEDS]) {
+    const h = blocks.findIndex(b => b.type === 'heading' && pattern.test(b.text) && !highlights.some(x => x.title === b.text));
+    if (h < 0) continue;
+    const items: string[] = [];
+    for (const b of blocks.slice(h + 1)) { if (b.type === 'heading') break; if (b.type === 'bullet') items.push(b.text); }
+    if (items.length) highlights.push({ title: blocks[h].text, items: items.slice(0, maxItems), more: Math.max(0, items.length - maxItems) });
+  }
+  return { overview: overview.join('\n\n'), highlights };
+}
+
 /** Splits "**bold** rest" into runs. Unbalanced markers are dropped rather than shown. */
 export function splitBold(text: string) {
   const parts = text.split('**');

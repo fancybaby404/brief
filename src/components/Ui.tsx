@@ -6,9 +6,12 @@ import { KeyboardEvents } from 'react-native-keyboard-controller';
 import { scheduleOnRN } from 'react-native-worklets';
 import { EASE_OUT, EASE_OUT_CSS, EASE_SHEET, LIST_REFLOW, SPRING_SHEET, project, rubberband } from '../theme/motion';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image as ExpoImage } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { C,R,SPRING } from '../theme/tokens';
+import { STATUS_LABEL } from '../lib/tracker';
+import type { ApplicationStatus } from '../types';
 /** Floating bar is 62pt high; Shell already applies the device's bottom safe area. */
 export const FLOATING_NAV_HEIGHT=62;
 export function useFloatingNavClearance(){return FLOATING_NAV_HEIGHT+12;}
@@ -38,7 +41,8 @@ export const FACES={
  question:require('../../assets/mascot/question.png'),sad:require('../../assets/mascot/sad.png'),error:require('../../assets/mascot/error.png'),
 } as const;
 export type Mood=keyof typeof FACES;
-export function Mascot({size=125,mood='happy'}:{size?:number,mood?:Mood}) {return <Image source={FACES[mood]} resizeMode="contain" style={{width:size,height:size}} accessibilityIgnoresInvertColors/>}
+/** expo-image: decoded at the displayed size and kept in memory, so remounts (tab switches, chat rows) don't re-decode the 842×924 PNG or flash. */
+export function Mascot({size=125,mood='happy'}:{size?:number,mood?:Mood}) {return <ExpoImage source={FACES[mood]} contentFit="contain" cachePolicy="memory" transition={null} priority="high" style={{width:size,height:size}}/>}
 /** Wordmark: lowercase "brief" in Fredoka Bold (700), loaded in App.tsx. */
 export const BRAND_FONT='Fredoka_700Bold';
 export function Wordmark({size=31}:{size?:number}) {return <View accessible accessibilityLabel="brief" style={{flexDirection:'row',alignItems:'center',gap:size*0.1}}><Text allowFontScaling={false} style={{fontFamily:BRAND_FONT,fontSize:size,lineHeight:size*1.23,color:'#050505',letterSpacing:-size*0.02,includeFontPadding:false}}>brief</Text><Mascot size={size*1.03}/></View>}
@@ -47,20 +51,32 @@ export function Brand({onPress}:{onPress?:()=>void}) {return <Tap accessibilityR
 export function Sparkles({size=44}:{size?:number}) {const w=size*0.15,h=size*0.4;
  const dash=(left:number,top:number,deg:number)=><View style={{position:'absolute',left:left*size,top:top*size,width:w,height:h,borderRadius:w/2,backgroundColor:C.blue,transform:[{rotate:`${deg}deg`}]}}/>;
  return <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{width:size,height:size}}>{dash(0.62,0,22)}{dash(0.3,0.22,-28)}{dash(0.04,0.56,-68)}</View>;}
-const STATUS_STYLES:{[status:string]:{label:string,background:string,color:string}}={
- interested:{label:'Interested',background:C.pale,color:C.blue},
- applied:{label:'Applied',background:'#E7F7FA',color:'#167A89'},
- under_review:{label:'Under review',background:'#FFF3E3',color:'#A35B00'},
- interview:{label:'Interview',background:'#F1ECFF',color:'#6543B8'},
- offer:{label:'Offer',background:C.greenSoft,color:C.green},
- rejected:{label:'Rejected',background:C.redSoft,color:C.danger},
+const STATUS_STYLES:{[status:string]:{background:string,color:string}}={
+ interested:{background:C.pale,color:C.blue},
+ applied:{background:'#E7F7FA',color:'#167A89'},
+ under_review:{background:'#FFF3E3',color:'#A35B00'},
+ interview:{background:'#F1ECFF',color:'#6543B8'},
+ offer:{background:C.greenSoft,color:C.green},
+ rejected:{background:C.redSoft,color:C.danger},
+ withdrawn:{background:C.pale2,color:C.muted},
 };
-export function StatusPill({status}:{status:string}) {const style=STATUS_STYLES[status];return <View style={{paddingHorizontal:10,paddingVertical:5,borderRadius:20,backgroundColor:style?.background||C.pale}}><Txt size={11} color={style?.color||C.muted}>{style?.label||status}</Txt></View>}
+/** Label and subtle colours for a status. Colour is never the only signal: the label always shows. */
+export function statusStyle(status:string){const s=STATUS_STYLES[status];return {label:STATUS_LABEL[status as ApplicationStatus]||status,background:s?.background||C.pale,color:s?.color||C.muted};}
+export function StatusPill({status}:{status:string}) {const style=statusStyle(status);return <View style={{paddingHorizontal:10,paddingVertical:5,borderRadius:20,backgroundColor:style.background}}><Txt size={11} color={style.color}>{style.label}</Txt></View>}
 export function SectionTitle({children,right,onRight}:{children:string,right?:string,onRight?:()=>void}) {return <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:9}}><Txt size={17} bold>{children}</Txt>{right&&<Tap accessibilityRole="button" hitSlop={12} onPress={onRight}><Txt size={13} color={C.blue}>{right}</Txt></Tap>}</View>}
-/** Provider logo when available; a neutral briefcase tile when missing or offline. Never a guessed logo. */
-export function CompanyLogo({uri,size=40}:{uri?:string,size?:number}) {const [failed,setFailed]=useState(false);const box={width:size,height:size,borderRadius:size*0.26};
- return uri&&!failed?<Image source={{uri}} onError={()=>setFailed(true)} resizeMode="contain" accessibilityIgnoresInvertColors style={[box,{backgroundColor:C.white,borderWidth:1,borderColor:C.line}]}/>
- :<View style={[box,{backgroundColor:C.pale2,alignItems:'center',justifyContent:'center'}]}><Icon name="briefcase-outline" color={C.blue} size={size*0.5}/></View>;}
+/** Logo URLs that failed this session: not retried on every remount (they'd flash the tile each time). */
+const BROKEN_LOGOS=new Set<string>(),LOADED_LOGOS=new Set<string>();
+/** Provider logo when available; a neutral briefcase tile when missing, broken or not yet loaded. Never a guessed logo.
+ *  expo-image keeps logos in memory and on disk (keyed by URL), so they show instantly on return and offline after first view. */
+export const CompanyLogo=React.memo(function CompanyLogo({uri,size=40}:{uri?:string,size?:number}) {
+ const [failed,setFailed]=useState(()=>!!uri&&BROKEN_LOGOS.has(uri)),[loaded,setLoaded]=useState(()=>!!uri&&LOADED_LOGOS.has(uri));const box={width:size,height:size,borderRadius:size*0.26};
+ const tile=<View style={[box,{backgroundColor:C.pale2,alignItems:'center',justifyContent:'center'}]}><Icon name="briefcase-outline" color={C.blue} size={size*0.5}/></View>;
+ if(!uri||failed)return tile;
+ // Seen this session = in expo-image's memory cache: draw it directly. New: the tile shows until it has loaded.
+ return <View style={box}>{!loaded&&tile}<ExpoImage source={{uri,cacheKey:uri}} recyclingKey={uri} cachePolicy="memory-disk" transition={null} contentFit="contain"
+  onLoad={()=>{LOADED_LOGOS.add(uri);setLoaded(true);}} onError={()=>{BROKEN_LOGOS.add(uri);setFailed(true);}}
+  style={[box,{position:'absolute'},loaded&&{backgroundColor:C.white,borderWidth:1,borderColor:C.line}]}/></View>;
+});
 /** True while the software keyboard is up; the floating bar hides so it never covers a composer. */
 /** "Will" events (both platforms via keyboard-controller) so the bar leaves as the keyboard starts, not after it lands. */
 export function useKeyboardVisible() {const [v,setV]=useState(false);useEffect(()=>{const a=KeyboardEvents.addListener('keyboardWillShow',()=>setV(true)),b=KeyboardEvents.addListener('keyboardWillHide',()=>setV(false));return ()=>{a.remove();b.remove();};},[]);return v;}
@@ -150,6 +166,24 @@ export const SCRIM_IN=FadeIn.duration(200).easing(EASE_OUT),SCRIM_OUT=FadeOut.du
 export function Popover({origin,style,children}:{origin:'top right'|'bottom right',style:StyleProp<ViewStyle>,children:React.ReactNode}) {
  const reduce=useReducedMotion();
  return <Reanimated.View layout={reduce?undefined:LIST_REFLOW} entering={reduce?FADE_IN:popIn} exiting={reduce?FADE_OUT:popOut} accessibilityViewIsModal style={[{position:'absolute',backgroundColor:C.white,borderRadius:18,borderWidth:1,borderColor:C.line,shadowColor:'#33446A',shadowOpacity:0.16,shadowRadius:18,elevation:13,transformOrigin:origin},style]}>{children}</Reanimated.View>;
+}
+
+export type MenuAction={label:string,icon:string,onPress:()=>void,destructive?:boolean};
+/** iOS-style "more" menu: a round icon button whose actions open anchored under it (same motion as PullDownMenu).
+ *  The menu leaves before the action runs, so an action that opens a sheet or alert never stacks on it. */
+export function ActionMenu({label,actions,icon='ellipsis-horizontal'}:{label:string,actions:MenuAction[],icon?:string}) {
+ const ref=useRef<View>(null);const [pos,setPos]=useState<{top:number,right:number}|null>(null),[open,setOpen]=useState(false);
+ const show=()=>ref.current?.measureInWindow((x,y,w,h)=>{setPos({top:y+h+6,right:Dimensions.get('window').width-(x+w)});setOpen(true);});
+ const hide=(then?:()=>void)=>{setOpen(false);setTimeout(()=>{setPos(null);then?.();},160);};
+ return <>
+ <View ref={ref} collapsable={false}><Tap accessibilityRole="button" accessibilityLabel={label} accessibilityHint="Opens a menu" hitSlop={6} onPress={show} style={{width:44,height:44,borderRadius:22,alignItems:'center',justifyContent:'center'}}><Icon name={icon} size={22} color={C.ink}/></Tap></View>
+ <Modal transparent visible={!!pos} animationType="none" statusBarTranslucent onRequestClose={()=>hide()}>
+ <Pressable accessibilityRole="button" accessibilityLabel="Close menu" style={{flex:1}} onPress={()=>hide()}/>
+ {pos&&open&&<Popover origin="top right" style={{top:pos.top,right:pos.right,minWidth:220,paddingVertical:4}}>
+ {actions.map((a,i)=><Tap key={a.label} accessibilityRole="menuitem" onPress={()=>{void Haptics.selectionAsync();hide(a.onPress);}} style={{flexDirection:'row',alignItems:'center',minHeight:46,paddingHorizontal:14,gap:10,borderTopWidth:i?1:0,borderTopColor:C.line}}><Txt size={15} color={a.destructive?C.danger:C.ink} style={{flex:1}}>{a.label}</Txt><Icon name={a.icon} size={18} color={a.destructive?C.danger:C.ink}/></Tap>)}
+ </Popover>}
+ </Modal>
+ </>;
 }
 
 /** iOS-style pull-down: a compact pill showing the current choice; the menu opens anchored under it. */

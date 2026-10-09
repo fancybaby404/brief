@@ -2,6 +2,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import type {CatalogModel} from './modelCatalog';
+import {timer} from './perf';
 export async function pickJobImage(camera=false):Promise<string|null> {
   if(camera){const perm=await ImagePicker.requestCameraPermissionsAsync();if(!perm.granted)throw new Error('Camera permission is needed to photograph a job post.');}
   const res=camera?await ImagePicker.launchCameraAsync({quality:0.85}):await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],quality:0.85});
@@ -96,12 +97,36 @@ export async function downloadCatalogBundle(model:CatalogModel,onProgress:(fract
     return {modelUri:paths[0],projectorUri:paths[1]||''};
   }catch(e){for(const path of paths)await FileSystem.deleteAsync(path,{idempotent:true}).catch(()=>{});throw e;}
 }
+/** Keeps a private, vision-ready copy (scaled, JPEG) of an attached image; the chat shows the same file. */
 export async function importChatImage(uri:string):Promise<string> {
   if(!FileSystem.documentDirectory)throw new Error('Private document storage is unavailable');
-  const ext=uri.split('?')[0].split('.').pop()?.toLowerCase();
-  const suffix=ext&&/^(jpg|jpeg|png|webp|bmp)$/.test(ext)?ext:'jpg';
-  const dest=FileSystem.documentDirectory+`chat-image-${Date.now()}.${suffix}`;
-  await FileSystem.copyAsync({from:uri,to:dest});return dest;
+  let src=uri;try{src=await prepareImageForVision(uri);}catch{/* keep the original if it can't be decoded here; the model may still read it */}
+  const dest=FileSystem.documentDirectory+`chat-image-${Date.now()}.jpg`;
+  await FileSystem.copyAsync({from:src,to:dest});return dest;
+}
+
+/** Longest edge sent to the vision model. Qwen3-VL's encoder (768-token budget) can't use more detail than
+ *  this, so scaling first saves decode time and memory without losing readable text; EXIF rotation is baked in. */
+export const VISION_MAX_EDGE=1536;
+export async function prepareImageForVision(uri:string):Promise<string>{
+ const {ImageManipulator,SaveFormat}=await import('expo-image-manipulator');
+ const done=timer('vision.preprocess');
+ const original=await ImageManipulator.manipulate(uri).renderAsync();
+ const long=Math.max(original.width,original.height);
+ const ctx=ImageManipulator.manipulate(uri);
+ if(long>VISION_MAX_EDGE)ctx.resize(original.width>=original.height?{width:VISION_MAX_EDGE}:{height:VISION_MAX_EDGE});
+ const out=await (await ctx.renderAsync()).saveAsync({compress:0.9,format:SaveFormat.JPEG});
+ done();
+ return out.uri;
+}
+
+/** The bundled mascot (a cartoon briefcase) as a local file, for the vision self-test in Settings. */
+export async function probeImageUri():Promise<string> {
+  const {Asset}=await import('expo-asset');
+  const asset=Asset.fromModule(require('../../assets/mascot-happy.png'));
+  await asset.downloadAsync();
+  if(!asset.localUri)throw new Error('The test image is unavailable.');
+  return asset.localUri;
 }
 
 export async function readResumeText(uri:string):Promise<string> {

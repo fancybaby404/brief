@@ -57,8 +57,8 @@ Open **Settings → On-device AI** and tap **Download model** to install the opt
 2. Resume preview in source is a **visual summary**, not a true inline PDF renderer. OS file opening is supported; implementation needed for full PDF preview (see follow-ups).
 3. PDF text extractor handles **digital PDF text**, not scanned PDFs; DOCX imported but not parsed in this starter. Editable career summary works immediately and is included in AI context.
 4. Local LLM needs a downloaded and supported GGUF plus physical-device performance testing. CPU first; tune hardware-specific layers.
-5. Mock is **typed role-play**. Voice input/on-device STT and live local TTS require additional native work; no server shortcuts.
-6. Notification screen exists but calendar alerts are not scheduled yet. No false notification claims.
+5. Mock supports **offline voice** (Whisper STT via whisper.rn + on-device platform TTS) after downloading the speech models in Settings, and falls back to typing otherwise. **Not yet tested on a device** — see `MULTIMODAL_AI_VOICE_VERIFICATION.md`.
+6. Event reminders are scheduled as local notifications (expo-notifications); delivery is not yet verified on a device.
 7. Native builds, compilation, network API calls, and hardware benchmarks could **not** be executed in this environment. `tests` cover static packaging/spec invariants only, not native runtime.
 
 ## Source links and licenses

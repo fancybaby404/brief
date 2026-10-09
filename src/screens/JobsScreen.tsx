@@ -1,13 +1,14 @@
-import React,{useEffect,useMemo,useState} from 'react';
-import {Alert,Linking,ScrollView,Switch,TextInput,View} from 'react-native';
+import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import {Alert,FlatList,Linking,RefreshControl,ScrollView,Switch,TextInput,View} from 'react-native';
 import {useBrief} from '../lib/appContext';import {C} from '../theme/tokens';
 import {Card,CompanyLogo,Heading,Icon,Primary,Sheet,StatusPill,Tap,Txt,useFloatingNavClearance,useReducedMotion} from '../components/Ui';
 import {SwipeAction} from '../components/SwipeAction';
+import {fetchJobs,peekJobs} from '../lib/jobsCache';
 import {Description} from '../components/Description';
 import {EmptyState,JobsSkeleton} from '../components/States';
 import Reanimated from 'react-native-reanimated';
 import {EASE_OUT_CSS,ROW_IN} from '../theme/motion';
-import {fetchRemoteJobs,activeFilterCount,INDUSTRIES,JobsError,DEFAULT_FILTERS,JOBICY_CREDIT_URL,type JobFilters} from '../lib/jobs';import {uid} from '../lib/db';import type {Application,RemoteJob} from '../types';
+import {freshness,activeFilterCount,INDUSTRIES,JobsError,DEFAULT_FILTERS,JOBICY_CREDIT_URL,type JobFilters} from '../lib/jobs';import {uid} from '../lib/db';import type {Application,RemoteJob} from '../types';
 
 const REGIONS:{value:JobFilters['geo'],label:string,phrase:string}[]=[{value:'philippines',label:'Philippines',phrase:'the Philippines'},{value:'apac',label:'Asia-Pacific',phrase:'Asia-Pacific'},{value:'',label:'Anywhere',phrase:'any region'}];
 const TYPES:{value:JobFilters['type'],label:string}[]=[{value:'',label:'Any'},{value:'Full-Time',label:'Full-time'},{value:'Part-Time',label:'Part-time'},{value:'Contract',label:'Contract'},{value:'Internship',label:'Internship'}];
@@ -36,9 +37,13 @@ function Choice<T extends string|number>({options,value,onChange,label,scroll=fa
 function toApplication(j:RemoteJob,existing?:Application):Application{
  return {id:existing?.id||uid('job'),title:j.title,company:j.company,location:j.location,salary:j.salary,pay:j.pay,employmentType:j.employmentType,description:j.description,sourceUrl:j.url,logoUrl:j.logo,status:existing?.status||'interested',createdAt:existing?.createdAt||new Date().toISOString(),appliedAt:existing?.appliedAt||null,notes:existing?.notes||''};
 }
+const Gap=()=><View style={{height:13}}/>;
 const Chip=({text}:{text:string})=><View style={{backgroundColor:C.pale,borderRadius:10,paddingHorizontal:10,paddingVertical:5,maxWidth:190}}><Txt size={12} color={C.blue}>{text}</Txt></View>;
 
-function JobCard({j,app,salary,onOpen,onAdd,onRemove}:{j:RemoteJob,app?:Application,salary:string,onOpen:()=>void,onAdd:()=>void,onRemove:()=>void}){
+type CardAction='open'|'add'|'remove';
+/** Memoized: a card re-renders only when its job, tracked state or salary text changes (not on every list update). */
+const JobCard=React.memo(function JobCard({j,app,salary,on}:{j:RemoteJob,app?:Application,salary:string,on:(k:CardAction,j:RemoteJob,a?:Application)=>void}){
+ const onOpen=()=>on('open',j),onAdd=()=>on('add',j),onRemove=()=>on('remove',j,app);
  const advanced=!!app&&app.status!=='interested';
  return <SwipeAction done={!!app} onCommit={onAdd} label="Add to Brief" doneLabel="In Brief" icon="bookmark" doneIcon="checkmark-circle">
  <Tap accessibilityRole="button" accessibilityLabel={`${j.title} at ${j.company}${app?', in Brief':''}`} accessibilityHint="Opens the job. Swipe left to add it to Brief."
@@ -59,12 +64,25 @@ function JobCard({j,app,salary,onOpen,onAdd,onRemove}:{j:RemoteJob,app?:Applicat
   {j.tags.slice(0,2).map(t=><Chip key={t} text={t}/>)}
  </View>
  </Tap></SwipeAction>;
-}
+});
 
-export function JobsScreen(){const {openJob,openApp,applications,putApp,removeApp,go,money,showToast}=useBrief();const reduce=useReducedMotion();const [query,setQuery]=useState(''),[filters,setFilters]=useState<JobFilters>(DEFAULT_FILTERS),[draft,setDraft]=useState<JobFilters>(DEFAULT_FILTERS),[showFilters,setShowFilters]=useState(false),[jobs,setJobs]=useState<RemoteJob[]>([]),[loading,setLoading]=useState(false),[error,setError]=useState<JobsError|null>(null),[batch,setBatch]=useState(0);
+export function JobsScreen(){const {openJob,openApp,applications,putApp,removeApp,go,money,showToast}=useBrief();const reduce=useReducedMotion();const [query,setQuery]=useState(''),[filters,setFilters]=useState<JobFilters>(DEFAULT_FILTERS),[draft,setDraft]=useState<JobFilters>(DEFAULT_FILTERS),[showFilters,setShowFilters]=useState(false),[jobs,setJobs]=useState<RemoteJob[]>([]),[loading,setLoading]=useState(false),[error,setError]=useState<JobsError|null>(null),[savedAt,setSavedAt]=useState<{at:number,offline:boolean}|null>(null),[refreshing,setRefreshing]=useState(false);
+ const seq=useRef(0),ctrl=useRef<AbortController|null>(null);
  const bottomClearance=useFloatingNavClearance();
- async function refresh(q=query,f=filters){setLoading(true);setError(null);try{setJobs(await fetchRemoteJobs(q,f));setBatch(b=>b+1);}catch(e){setError(e instanceof JobsError?e:new JobsError('server',(e as Error).message));setJobs([]);}finally{setLoading(false)}}
- useEffect(()=>{void refresh();},[]);
+ /** Cached listings appear at once; the network is used only when they're stale, missing or a refresh is asked for.
+  *  A newer search cancels an older one, so a slow response can never overwrite newer results. */
+ async function refresh(q=query,f=filters,force=false){
+  const id=++seq.current;ctrl.current?.abort();const c=new AbortController();ctrl.current=c;
+  const cached=await peekJobs(q,f).catch(()=>null);
+  if(id!==seq.current)return;
+  if(cached){setJobs(cached.jobs);setError(null);setLoading(false);setSavedAt({at:cached.fetchedAt,offline:false});if(!force&&freshness(cached.fetchedAt)==='fresh')return;}
+  else setLoading(true);
+  try{const r=await fetchJobs(q,f,c.signal);if(id!==seq.current)return;setJobs(r.jobs);setError(null);setSavedAt(null);}
+  catch(e){if(id!==seq.current||(e as Error)?.name==='AbortError')return;
+   const err=e instanceof JobsError?e:new JobsError('server',(e as Error).message);
+   if(cached)setSavedAt({at:cached.fetchedAt,offline:err.kind==='offline'});else{setError(err);setJobs([]);}}
+  finally{if(id===seq.current){setLoading(false);setRefreshing(false);}}}
+ useEffect(()=>{void refresh();return()=>ctrl.current?.abort();},[]);
  const count=activeFilterCount(filters);
  function apply(f:JobFilters){setShowFilters(false);setFilters(f);void refresh(query,f);}
  function applyQuick(id:typeof QUICK_FILTERS[number]['id']){
@@ -81,8 +99,11 @@ export function JobsScreen(){const {openJob,openApp,applications,putApp,removeAp
  const usedSwipe=applications.some(a=>a.sourceUrl.includes('jobicy.com'));
  async function add(j:RemoteJob){if(byUrl.has(j.url))return;const a=toApplication(j);await putApp(a);showToast('Added to Brief',{label:'View',onPress:()=>openApp(a)});}
  function remove(a:Application){const del=()=>void removeApp(a.id,false);if(a.notes)Alert.alert('Remove from Brief?','This job has private notes that will be deleted.',[{text:'Cancel',style:'cancel'},{text:'Remove',style:'destructive',onPress:del}]);else del();}
+ // One stable handler for every card (reads the latest closures through a ref), so memoized cards stay memoized.
+ const latest=useRef({add,remove,openJob});latest.current={add,remove,openJob};
+ const onCard=useCallback((k:CardAction,j:RemoteJob,a?:Application)=>{const h=latest.current;if(k==='open')h.openJob(j);else if(k==='add')void h.add(j);else if(a)h.remove(a);},[]);
  const set=<K extends keyof JobFilters>(k:K)=>(v:JobFilters[K])=>setDraft(d=>({...d,[k]:v}));
- return <><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:18,paddingBottom:bottomClearance,gap:13}}><View style={{gap:2}}><Heading>Explore jobs</Heading><Txt color={C.muted}>Find your next opportunity</Txt></View>
+ const header=<View style={{gap:13,paddingBottom:13}}><View style={{gap:2}}><Heading>Explore jobs</Heading><Txt color={C.muted}>Find your next opportunity</Txt></View>
  <View style={{flexDirection:'row',gap:8}}>
  <View style={{backgroundColor:C.pale2,flex:1,borderRadius:14,flexDirection:'row',alignItems:'center',paddingLeft:12,minHeight:46}}><Icon name="search" size={18} color={C.muted}/><TextInput accessibilityLabel="Search jobs" returnKeyType="search" clearButtonMode="never" style={{flex:1,paddingHorizontal:8,paddingVertical:10,color:C.ink,fontSize:15}} value={query} onChangeText={setQuery} placeholder="Roles or keywords" placeholderTextColor={C.soft} onSubmitEditing={()=>void refresh()}/>
  {!!query&&<Tap accessibilityRole="button" accessibilityLabel="Clear search" hitSlop={8} onPress={()=>{setQuery('');void refresh('');}} style={{padding:10}}><Icon name="close-circle" size={18} color={C.soft}/></Tap>}</View>
@@ -95,8 +116,13 @@ export function JobsScreen(){const {openJob,openApp,applications,putApp,removeAp
  {!loading&&error?.kind==='offline'&&<EmptyState mood="sad" title="You’re offline" body={error.message} action={{label:'Try again',icon:'refresh',onPress:()=>void refresh()}} secondary={applications.length?{label:'Open my saved jobs',onPress:()=>go('applications')}:undefined}/>}
  {!loading&&error?.kind==='server'&&<EmptyState mood="error" title="Jobs couldn’t load" body={error.message} action={{label:'Try again',icon:'refresh',onPress:()=>void refresh()}}/>}
  {!loading&&!error&&jobs.length===0&&<EmptyState mood="question" title="No jobs found" body={`Nothing matches${query?` “${query.trim()}”`:''}${count?' with these filters':''} right now. Jobicy lists recent remote jobs, so try a broader search.`} action={count?{label:'Reset filters',onPress:()=>apply(DEFAULT_FILTERS)}:undefined} secondary={query?{label:'Clear search',onPress:()=>{setQuery('');void refresh('');}}:undefined}/>}
- {!loading&&jobs.length>0&&<Reanimated.View key={batch} entering={ROW_IN} style={{gap:13}}>{jobs.map(j=>{const a=byUrl.get(j.url);return <JobCard key={j.id} j={j} app={a} salary={money(j)} onOpen={()=>openJob(j)} onAdd={()=>void add(j)} onRemove={()=>a&&remove(a)}/>;})}</Reanimated.View>}
- </ScrollView>
+ {!!savedAt&&!loading&&jobs.length>0&&<View accessibilityLiveRegion="polite" style={{flexDirection:'row',alignItems:'center',gap:6}}><Icon name={savedAt.offline?'cloud-offline-outline':'time-outline'} size={14} color={C.muted}/><Txt size={12} color={C.muted} style={{flex:1}}>{savedAt.offline?'Offline · ':''}Listings saved {new Date(savedAt.at).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}. Some may have closed.</Txt></View>}
+ </View>;
+ return <><FlatList data={!loading&&!error?jobs:[]} keyExtractor={j=>j.id} ListHeaderComponent={header}
+  renderItem={({item})=><JobCard j={item} app={byUrl.get(item.url)} salary={money(item)} on={onCard}/>}
+  ItemSeparatorComponent={Gap} keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:18,paddingBottom:bottomClearance}}
+  initialNumToRender={6} maxToRenderPerBatch={6} windowSize={7} removeClippedSubviews
+  refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);void refresh(query,filters,true);}} tintColor={C.blue} colors={[C.blue]}/>}/>
  <Sheet scroll visible={showFilters} onClose={()=>setShowFilters(false)} title="Filters"
   footer={<View style={{flexDirection:'row',gap:10}}><View style={{flex:1}}><Primary secondary label="Reset" onPress={()=>setDraft(DEFAULT_FILTERS)}/></View><View style={{flex:2}}><Primary label="Show jobs" onPress={()=>apply(draft)}/></View></View>}>
  <View style={{gap:22,paddingBottom:4}}>

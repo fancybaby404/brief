@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';
 const root=path.resolve(import.meta.dirname,'..');const read=p=>fs.readFileSync(path.join(root,p),'utf8');
-test('onboarding, four tabs, resume, imports and mock routes exist',()=>{const app=read('App.tsx');for(const key of ['home','jobs','calendar','mock','resume','add-job','applications','chat'])assert.ok(app.includes(key),key);});
+test('onboarding, four tabs, resume, imports and mock routes exist',()=>{const app=read('App.tsx');for(const key of ['home','jobs','calendar','mock','resume','AddJobScreen','applications','chat'])assert.ok(app.includes(key),key);});
 test('floating quick menu contains exactly two destinations',()=>{const chrome=read('src/components/Chrome.tsx');assert.ok(chrome.includes('Add Job'));assert.ok(chrome.includes('Ask Brief'));assert.ok(chrome.includes("width:'52%'"));});
 test('real model uses llama.rn and no hosted inference',()=>{const ai=read('src/lib/ai.ts');assert.ok(ai.includes("import('llama.rn')"));assert.ok(ai.includes('ctx.completion'));assert.equal(/api\.openai\.com|openrouter\.ai|ollama\.com/.test(ai),false);});
 test('job discovery is an explicitly separate online adapter',()=>{const jobs=read('src/lib/jobs.ts');assert.ok(jobs.includes('jobicy.com/api/v2/remote-jobs'));});

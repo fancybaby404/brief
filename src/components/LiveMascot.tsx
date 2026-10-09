@@ -1,5 +1,6 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {Animated,Easing,Image,Pressable,View} from 'react-native';
+import {Animated,Easing,Pressable,View} from 'react-native';
+import {Image} from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import {FACES,Sparkles,useReducedMotion,type Mood} from './Ui';
 
@@ -63,11 +64,11 @@ export function LiveMascot({size,mood='happy',label='Brief, the mascot'}:{size:n
   style={{width:size,height:size}}>
  <Animated.View style={[{width:size,height:size},bodyStyle]}>
   {/* All faces stay mounted (decoded once); only the active one is visible, so swaps are instant. */}
-  {MOODS.map(m=><Image key={m} source={FACES[m]} resizeMode="contain" accessibilityIgnoresInvertColors style={{position:'absolute',width:size,height:size,opacity:m===face?1:0}}/>)}
+  {MOODS.map(m=><Image key={m} source={FACES[m]} contentFit="contain" cachePolicy="memory" transition={null} priority="high" style={{position:'absolute',width:size,height:size,opacity:m===face?1:0}}/>)}
  </Animated.View>
  <Animated.View pointerEvents="none" style={[{position:'absolute',left:-size*0.14,top:-size*0.04},sparkleStyle]}><Sparkles size={size*0.34}/></Animated.View>
  <Animated.View pointerEvents="none" style={[{position:'absolute',left:offset+Q.left*imgW,top:Q.top*size,width:Q.width*imgW,height:Q.height*size},questionStyle]}>
-  <Image source={require('../../assets/mascot/marks-question.png')} resizeMode="contain" style={{width:'100%',height:'100%'}}/>
+  <Image source={require('../../assets/mascot/marks-question.png')} contentFit="contain" cachePolicy="memory" transition={null} style={{width:'100%',height:'100%'}}/>
  </Animated.View>
  </Pressable>;
 }

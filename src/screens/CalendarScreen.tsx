@@ -1,21 +1,24 @@
-import React,{useEffect,useMemo,useRef,useState} from 'react';import {Alert,ScrollView,View} from 'react-native';
+import React,{useMemo,useState} from 'react';import {Alert,ScrollView,View} from 'react-native';
 import Reanimated,{FadeIn,FadeInLeft,FadeInRight,LayoutAnimationConfig} from 'react-native-reanimated';
 import {Directions,Gesture,GestureDetector} from 'react-native-gesture-handler';
-import {useBrief} from '../lib/appContext';import {C} from '../theme/tokens';import {Card,Field,Heading,Icon,Primary,SectionTitle,Txt,Tap,useReducedMotion,useFloatingNavClearance} from '../components/Ui';import {uid} from '../lib/db';import {EmptyState} from '../components/States';
+import {useBrief} from '../lib/appContext';import {C} from '../theme/tokens';import {Card,Heading,Icon,SectionTitle,Txt,Tap,useReducedMotion,useFloatingNavClearance} from '../components/Ui';import {EmptyState} from '../components/States';
+import {EventSheet,type EventDraft} from '../components/EventSheet';
+import {kindInfo,kindOf} from '../lib/events';
+import type {Event} from '../types';
 import {EASE_OUT,EASE_OUT_CSS,LIST_REFLOW,ROW_IN,ROW_OUT} from '../theme/motion';
-import {formatTime,formatTimeInput,parseTimeInput} from '../lib/time';
+import {formatTime} from '../lib/time';
 
 // The new month arrives from the side you moved toward; a fade only with Reduce Motion.
 const MONTH_NEXT=FadeInRight.duration(220).easing(EASE_OUT),MONTH_PREV=FadeInLeft.duration(220).easing(EASE_OUT),MONTH_FADE=FadeIn.duration(150).easing(EASE_OUT);
 const pad=(n:number)=>String(n).padStart(2,'0');
 
-export function CalendarScreen(){const {events,putEvent,removeEvent,timeFormat}=useBrief();const reduce=useReducedMotion();const bottomClearance=useFloatingNavClearance();
+export function CalendarScreen(){const {events,applications,removeEvent,timeFormat}=useBrief();const reduce=useReducedMotion();const bottomClearance=useFloatingNavClearance();
  const today=new Date();
- const [month,setMonth]=useState(today.getMonth()),[year,setYear]=useState(today.getFullYear()),[day,setDay]=useState(today.getDate()),[dir,setDir]=useState(0),[adding,setAdding]=useState(false),[title,setTitle]=useState(''),[time,setTime]=useState('10:00 AM'),[notes,setNotes]=useState('');
- const previousTimeFormat=useRef(timeFormat);
- useEffect(()=>{if(previousTimeFormat.current!==timeFormat){const normalized=parseTimeInput(time,previousTimeFormat.current);if(normalized)setTime(formatTimeInput(normalized,timeFormat));previousTimeFormat.current=timeFormat;}},[time,timeFormat]);
+ const [month,setMonth]=useState(today.getMonth()),[year,setYear]=useState(today.getFullYear()),[day,setDay]=useState(today.getDate()),[dir,setDir]=useState(0);
+ // One shared editor (EventSheet) for new and existing events; kept after closing so it doesn't change mode mid-dismiss.
+ const [sheet,setSheet]=useState<{open:boolean,event?:Event,draft?:EventDraft}>({open:false});
+ const addEvent=()=>setSheet({open:true,draft:{applicationId:null,kind:'other',date:new Date(year,month,day,10,0)}});
  const first=new Date(year,month,1).getDay(),length=new Date(year,month+1,0).getDate();const cells=[...Array(first).fill(0),...Array.from({length},(_,i)=>i+1)];
- const selected=`${year}-${pad(month+1)}-${pad(day)}`;
  const monthLabel=new Date(year,month,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
  const isThisMonth=year===today.getFullYear()&&month===today.getMonth();
  const todayKey=today.toISOString().slice(0,10);
@@ -28,7 +31,6 @@ export function CalendarScreen(){const {events,putEvent,removeEvent,timeFormat}=
   Gesture.Fling().direction(Directions.LEFT).runOnJS(true).onEnd(()=>move(1)),
   Gesture.Fling().direction(Directions.RIGHT).runOnJS(true).onEnd(()=>move(-1)),
  ),[year,month]);
- async function add(){if(!title.trim())return Alert.alert('Add event title');const normalizedTime=parseTimeInput(time,timeFormat);if(!normalizedTime)return Alert.alert('Check the time',timeFormat==='12h'?'Enter a time like 4:30 PM.':'Enter a time like 16:30.');await putEvent({id:uid('event'),applicationId:null,title:title.trim(),date:selected+'T'+normalizedTime+':00',notes});setAdding(false);setTitle('');setTime(formatTimeInput('10:00',timeFormat));setNotes('');}
  const entering=reduce?MONTH_FADE:dir>0?MONTH_NEXT:dir<0?MONTH_PREV:MONTH_FADE;
  return <LayoutAnimationConfig skipEntering><ScrollView contentContainerStyle={{padding:18,paddingBottom:bottomClearance,gap:15}}><Heading>Calendar</Heading><Txt color={C.muted}>Stay on top of interviews, follow-ups, and deadlines.</Txt>
  <Card style={{overflow:'hidden'}}>
@@ -49,9 +51,10 @@ export function CalendarScreen(){const {events,putEvent,removeEvent,timeFormat}=
   </Reanimated.View>
   </GestureDetector>
  </Card>
- <SectionTitle right={adding?'Cancel':'Add event'} onRight={()=>setAdding(!adding)}>Upcoming events</SectionTitle>
- {adding&&<Reanimated.View entering={ROW_IN} exiting={ROW_OUT}><Card><Txt bold>New event · {selected}</Txt><Field label="Event" value={title} onChangeText={setTitle} placeholder="Interview with..."/><Field label={`Time (${timeFormat==='12h'?'12-hour':'24-hour'})`} value={time} onChangeText={setTime} placeholder={timeFormat==='12h'?'e.g. 4:30 PM':'e.g. 16:30'}/><Field label="Notes" value={notes} onChangeText={setNotes}/><Primary label="Save event" onPress={()=>void add()}/></Card></Reanimated.View>}
- {!adding&&upcoming.length===0&&<EmptyState card compact title="Nothing scheduled" body="Add interviews, follow-ups and deadlines so nothing sneaks up on you." action={{label:'Add event',onPress:()=>setAdding(true)}}/>}
- {upcoming.map(e=><Reanimated.View key={e.id} layout={LIST_REFLOW} entering={ROW_IN} exiting={ROW_OUT}><Tap accessibilityRole="button" accessibilityHint="Long press to delete" onLongPress={()=>Alert.alert('Delete event?',e.title,[{text:'Cancel',style:'cancel'},{text:'Delete',style:'destructive',onPress:()=>void removeEvent(e.id)}])} style={{flexDirection:'row',gap:12,alignItems:'center',borderRadius:17,backgroundColor:C.white,padding:13,borderWidth:1,borderColor:C.line}}><View style={{width:45,alignItems:'center'}}><Txt size={10} color={C.blue}>{new Date(e.date).toLocaleDateString('en-US',{month:'short'}).toUpperCase()}</Txt><Txt size={23} bold>{new Date(e.date).getDate()}</Txt></View><View style={{flex:1}}><Txt bold>{e.title}</Txt><Txt color={C.muted} size={12}>{new Date(e.date).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})} · {formatTime(e.date,timeFormat)}</Txt>{!!e.notes&&<Txt color={C.muted} size={11}>{e.notes}</Txt>}</View><Icon name="calendar-outline" color={C.blue}/></Tap></Reanimated.View>)}
- </ScrollView></LayoutAnimationConfig>;
+ <SectionTitle right="Add event" onRight={addEvent}>Upcoming events</SectionTitle>
+ {upcoming.length===0&&<EmptyState card compact title="Nothing scheduled" body="Add interviews, follow-ups and deadlines so nothing sneaks up on you." action={{label:'Add event',onPress:addEvent}}/>}
+ {upcoming.map(e=><Reanimated.View key={e.id} layout={LIST_REFLOW} entering={ROW_IN} exiting={ROW_OUT}><Tap accessibilityRole="button" accessibilityHint="Opens the event. Long press to delete" onPress={()=>setSheet({open:true,event:e})} onLongPress={()=>Alert.alert('Delete event?',e.title,[{text:'Cancel',style:'cancel'},{text:'Delete',style:'destructive',onPress:()=>void removeEvent(e.id)}])} style={{flexDirection:'row',gap:12,alignItems:'center',borderRadius:17,backgroundColor:C.white,padding:13,borderWidth:1,borderColor:C.line}}><View style={{width:45,alignItems:'center'}}><Txt size={10} color={C.blue}>{new Date(e.date).toLocaleDateString('en-US',{month:'short'}).toUpperCase()}</Txt><Txt size={23} bold>{new Date(e.date).getDate()}</Txt></View><View style={{flex:1}}><Txt bold>{e.title}</Txt><Txt color={C.muted} size={12}>{[kindInfo(kindOf(e)).label,applications.find(a=>a.id===e.applicationId)?.company,new Date(e.date).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})+' · '+formatTime(e.date,timeFormat)].filter(Boolean).join(' · ')}</Txt>{!!e.notes&&<Txt color={C.muted} size={11}>{e.notes}</Txt>}</View><Icon name="chevron-forward" size={16} color={C.soft}/></Tap></Reanimated.View>)}
+ </ScrollView>
+ <EventSheet visible={sheet.open} event={sheet.event} draft={sheet.draft} onClose={()=>setSheet(s=>({...s,open:false}))}/>
+ </LayoutAnimationConfig>;
 }

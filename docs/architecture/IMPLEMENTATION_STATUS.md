@@ -17,7 +17,7 @@
 - No GGUF file included. User must import permitted model weights into app storage.
 - No inline true PDF rendering (needs native PDF component), DOCX text extraction, scanned PDF OCR, automatic resume parsing into profile fields.
 - No live speech-to-text mock interview or trustworthy microphone waveform; mock is typed and local.
-- No real notification scheduling and no functional event edit screen beyond create/delete.
+- Event reminders are local notifications (expo-notifications) scheduled on save; not yet verified firing on a device. No notification-tap deep link into the event.
 - No OS share extension or background worker/streaming LLM UI.
 - No release-grade offline provider caching, API pagination or Philippine listings provider.
 - No automated E2E mobile device tests, no actual APK/IPA generated.
@@ -25,6 +25,42 @@
 - Vision projector pairing, image chat, generated suggestion quality, and waiting animation feel are not yet verified on a development build/device.
 
 ## Change log
+
+### 2026-10-10 — Performance pass
+- Report and honest status: `PERFORMANCE_OPTIMIZATION_REPORT.md`. Only the SQLite query change is measured (desktop benchmark); the rest needs a release build on a phone.
+- Keep-alive + `Freeze` for Home/Jobs/Calendar/Applications/Ask Brief (Mock still unmounts to release audio/Whisper). `expo-image` for mascot faces and company logos (memory/disk cache, view-size decode); Ionicons preloaded.
+- SQLite: `messages_by_thread` index, thread-scoped/paged queries, message upsert (fixes card messages moving to the end after restart), transactions, `synchronous=NORMAL`, `cache` table.
+- Jobs: cache-first (memory + SQLite) with 15-min freshness, revalidation, dedupe, cancellation, timeout, offline fallback with "saved at" note; filter changes re-filter locally; `FlatList` with memoized cards; pull to refresh.
+- Applications: virtualized list, memoized rows, deferred search. Ask Brief: newest 60 messages + "Show earlier", throttled streaming, chips only when the model is loaded. Model and Whisper released after 3 idle min in background.
+- Settings → Diagnostics: on-device timings (startup, DB, model/vision/STT load, TTFT, prompt, tok/s, image prep, agent turn, transcription, TTS start, jobs fetch).
+
+### 2026-10-10 — Offline voice interviews and multimodal tuning
+- Full status and offline test steps: `MULTIMODAL_AI_VOICE_VERIFICATION.md`. **Nothing here is device-tested yet; a new build is required.**
+- STT: `whisper.rn` 0.7.4 (Whisper base.en/small.en q5_1 + Silero VAD, SHA-256-verified downloads in Settings → Voice interviews), `@fugood/react-native-audio-pcm-stream` 1.1.4 capture (16 kHz PCM, in memory only), `buffer` polyfill. TTS: `expo-speech` with a verified on-device voice (iOS any; Android Google `-local`). `src/lib/voice/`: `machine.ts` (turn-taking reducer), `audio.ts` (PCM, end-of-speech, cleanup), `sha256.ts`, `catalog.ts`, `sessions.ts`, `stt.ts`, `tts.ts`.
+- Mock: Speak/Type, mic with live level ring, speaking indicator, editable transcript, Replay / Stop speaking / Skip / Pause / Resume / End, hands-free option, 5-question progress with automatic wrap-up, structured feedback card, Past interviews (review + continue). Modes add resume deep-dive and topics.
+- Qwen3-VL: vision encoder loads lazily on the first image (768 image tokens) and is released for voice; chat images are pre-scaled to 1536 px JPEG (`expo-image-manipulator`); camera or library in Ask Brief; resume-from-image card.
+- Ask Brief: continue previous interview, "what did I struggle with", interview card offers Speak/Type, screenshot → save → practice.
+
+### 2026-10-10 — Local AI agent (Ask Brief tools, vision import, mock modes)
+- See `LOCAL_AI_AGENTIC_VERIFICATION.md` for the full report and honest status of each feature. Nothing here is device-tested yet.
+- `src/lib/agent/`: `validate.ts` (arg/JSON validation → JSON Schema), `dates.ts` (local-time parsing), `resolve.ts` (names → record IDs), `intent.ts` (rules + router schema), `tools.ts` (24-tool allowlist registry), `plan.ts` (message → reply/card/answer/vision), `execute.ts` (confirmed, verified, once-only writes + Undo). Pure; tested in `tests/agent.test.mjs`.
+- `ai.ts`: serialized completions, streaming, Stop (`stopGeneration`), JSON-schema output, `routeIntent`, `visionExtractJobs`/`visionExtractEvent` (Qwen3-VL + OCR text), `probeVision` (Settings image self-test), `inspectModel` (GGUF architecture check), release on memory warning.
+- Ask Brief: native cards (`AgentCards.tsx`) for job lists/selection, confirm + Undo, status picker, editable job import preview, event preview (opens the shared `EventSheet`), interview setup, follow-ups; focused-job pill; Stop; "From your saved data" label on record-based replies. Saved-data actions work without a model.
+- Mock: modes (role-specific, HR, behavioral, technical, hiring manager, general), single-question practice (`practice:<jobId>` thread), New session archives the old one as history; streaming + Stop.
+- New dependency: `expo-asset` (was already transitive via `expo`).
+
+### 2026-10-10 — Application detail redesign
+- `ApplicationDetailScreen` rebuilt as a workspace for one job: own top bar (back, compact title that fades in as the large title scrolls under it, `ActionMenu` with Open original posting / Share / Delete), floating tab bar hidden. Order: identity (logo, company, title, location · type · salary) → compact status button + "since" date → Ask Brief / Practice → **Up next** → About the role → Your notes → Activity.
+- Status: seven statuses (`withdrawn` added; `under_review` labelled "In review", `rejected` labelled "Not selected" — stored values unchanged). `StatusSheet` replaces the five-step `StatusTracker`; closed statuses are listed under CLOSED, never styled as a warning. Moving to Interview offers "Schedule it" (toast action); nothing is created automatically.
+- Activity: `putApp` runs `trackStatus` so every status move is appended to `Application.activity` from any screen (a change back within a minute rewrites the last entry; back to Interested clears `appliedAt`). `buildActivity` merges saved date, status moves (or the legacy applied date) and the job's events, newest first; four shown, "Show all".
+- Up next (`nextActions`): Interested → "I've applied", add deadline, review posting; Applied → follow-up, prepare; In review → follow-up, add assessment/event; Interview → schedule (if none upcoming), practice; Offer → review with Brief, decision deadline, note offer details; Not selected / Withdrawn → no actions, history kept. Upcoming events for the job are listed first and open the editor.
+- Events: one `EventSheet` (page sheet) for both the job and Calendar — type (Interview, Deadline, Assessment, Follow-up, Other), title suggested from the job, native date/time pickers (`@react-native-community/datetimepicker`: compact on iOS, dialogs on Android honouring 12/24 h), location or link, reminder (None, at time, 15 min, 1 h, 1 day), notes, delete. Same job + kind + minute is refused as a duplicate. Saving a new interview before the Interview stage offers "Move to Interview". Calendar rows now open the editor (long-press delete kept) and show kind and company. Deleting a job deletes its events and cancels their reminders.
+- Reminders (`src/lib/reminders.ts`): permission asked only when a reminder is picked; denied/passed/failed reminders are not stored, and the toast says why. Lock-screen text is title, kind, time and location — never notes. Notifications screen lists scheduled reminders.
+- Description: `JobDescription` shows the overview paragraph(s), then the listing's own responsibilities/requirements sections (first four bullets) when present (`jobSummary`), and "Show full description" renders the original text in order. Nothing is inferred.
+- Notes: `NotesSheet` (page sheet, Done, private hint, delete with confirm) autosaves while typing and flushes on Done, swipe-down, blur and app backgrounding.
+- Ask Brief / Practice opened from a job return to it on Back (header and Android back) via `returnTo`.
+- `FormSheet` measures keyboard overlap in window coordinates (RN `KeyboardAvoidingView` under-counts inside an iOS page sheet).
+- **Needs a new development build**: adds `expo-notifications` and `@react-native-community/datetimepicker` native modules.
 
 ### 2026-10-09 — In-app local model catalog and downloads
 - Settings now offers two pinned Qwen GGUF options from Hugging Face, with approximate download sizes, Apache 2.0 license, direct in-app download, progress, cancel, low-storage handling, and local import fallback.

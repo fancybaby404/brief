@@ -18,8 +18,8 @@ React Native 0.86 via Expo SDK 57; TypeScript strict mode; real-device **develop
 ## Data boundary & schema
 **SQLite persisted:** applications (id, company, title, status, description, etc), calendar events, message threads (including private image URI and generated suggestions) and profile info (experience, skills, resume URI, extracted text), imported GGUF and optional projector URIs.
 
-Application: id, company, title, status, location, salary, employmentType, description, sourceUrl, createdAt, appliedAt?, notes.
-Event: id, applicationId?, title, date ISO, notes.
+Application: id, company, title, status (interested · applied · under_review · interview · offer · rejected · withdrawn), location, salary, employmentType, description, sourceUrl, createdAt, appliedAt?, notes, activity? ([{at, from, to}] status moves, appended by `trackStatus` in `putApp`).
+Event: id, applicationId?, title, date (local `YYYY-MM-DDTHH:mm:00`), notes, kind? (interview · deadline · assessment · follow_up · other; missing = other), location?, createdAt?, reminderMinutes?, notificationId? (local notification to cancel on edit/delete).
 Profile: name, skills, education, experience, goals, resumeUri, resumeText.
 Message: id, thread, user/assistant role, content, timestamp.
 

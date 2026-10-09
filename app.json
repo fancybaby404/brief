@@ -31,8 +31,8 @@
         "expo-camera",
         {
           "cameraPermission": "Brief uses the camera to scan job listings.",
-          "microphonePermission": false,
-          "recordAudioAndroid": false
+          "microphonePermission": "Brief uses the microphone for spoken answers in mock interviews. Speech is transcribed on this phone; audio is never saved or uploaded.",
+          "recordAudioAndroid": true
         }
       ],
       [
@@ -52,7 +52,15 @@
           "enforceContrast": false
         }
       ],
-      "expo-image"
+      "expo-image",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          "color": "#1677F2"
+        }
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "reactCompiler": false

@@ -3,14 +3,20 @@ import {Alert,ScrollView,Switch,View} from 'react-native';
 import {useBrief} from '../lib/appContext';import {C} from '../theme/tokens';
 import {Card,Field,Heading,Icon,Input,Mascot,Primary,PullDownMenu,Txt,Tap,useFloatingNavClearance} from '../components/Ui';
 import {CURRENCIES} from '../lib/currency';
-import {deleteLocalFile,downloadCatalogBundle,importResume,pickModel,pickVisionProjector} from '../lib/imports';import {benchmarkModel,configureModel,configureVisionProjector,modelPath,visionProjectorPath,supportsVision} from '../lib/ai';
+import {deleteLocalFile,downloadCatalogBundle,importResume,pickModel,pickVisionProjector,probeImageUri} from '../lib/imports';import {benchmarkModel,configureModel,configureVisionProjector,inspectModel,modelPath,probeVision,visionProjectorPath,supportsVision} from '../lib/ai';
+/** Real image inference on a bundled picture: proves the vision encoder works, not just that it loaded. */
+async function visionCheck(){const v=await probeVision(await probeImageUri());return {...v,label:v.passed?`image check passed (“${v.answer}”, ${(v.ms/1000).toFixed(1)} s)`:`image check unclear: the model said “${v.answer||'nothing'}”`};}
 import {MODEL_CATALOG,type CatalogModel} from '../lib/modelCatalog';
 import * as Sharing from 'expo-sharing';
 import {EmptyState,ModelSetupOverlay,type ModelSetupStage} from '../components/States';
 import {ProfileForm} from '../components/ProfileForm';
+import {VoiceSettings} from '../components/VoiceSettings';
+import {PerfPanel} from '../components/PerfPanel';
 import Reanimated,{LayoutAnimationConfig} from 'react-native-reanimated';
 import {ROW_IN,ROW_OUT} from '../theme/motion';
 import {listItems} from '../lib/profile';
+import {reminderAt,reminderLabel} from '../lib/events';
+import {formatTime} from '../lib/time';
 export function ResumeScreen(){const {profile,updateProfile}=useBrief();const bottomClearance=useFloatingNavClearance();const [editing,setEditing]=useState(false),[busy,setBusy]=useState(false);
  async function attach(){setBusy(true);try{const r=await importResume(profile.resumeUri);if(!r)return;await updateProfile({...profile,resumeUri:r.resumeUri,resumeText:r.resumeText,useResumeForAI:true});
   if(r.note)Alert.alert('Resume added',`${r.note} Add a few details so Brief can use them.`,[{text:'Later',style:'cancel'},{text:'Enter details',onPress:()=>setEditing(true)}]);}
@@ -41,7 +47,14 @@ export function ResumeScreen(){const {profile,updateProfile}=useBrief();const bo
  <ProfileForm visible={editing} profile={profile} onClose={()=>setEditing(false)} onSave={d=>{setEditing(false);void updateProfile({...profile,...d});}}/>
  </ScrollView></LayoutAnimationConfig>;
 }
-export function NotificationsScreen(){const {goTab}=useBrief();const bottomClearance=useFloatingNavClearance();return <ScrollView contentContainerStyle={{padding:18,paddingBottom:bottomClearance,gap:15}}><Heading>Notifications</Heading><EmptyState title="You’re all caught up" body="Brief doesn’t send reminders yet. Your interviews and deadlines are in Calendar." action={{label:'Open Calendar',onPress:()=>goTab('calendar')}}/></ScrollView>}
+/** Reminders actually scheduled on this phone (events whose local notification was set). */
+export function NotificationsScreen(){const {goTab,events,timeFormat}=useBrief();const bottomClearance=useFloatingNavClearance();
+ const now=Date.now(),list=events.filter(e=>e.notificationId&&reminderAt(e,now)).sort((a,b)=>a.date.localeCompare(b.date));
+ return <ScrollView contentContainerStyle={{padding:18,paddingBottom:bottomClearance,gap:15}}><Heading>Notifications</Heading>
+ {list.length?<><Txt color={C.muted}>Reminders scheduled on this phone. Change one from its event in Calendar.</Txt>
+  {list.map(e=><View key={e.id} style={{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:C.white,borderRadius:16,padding:14}}><Icon name="notifications-outline" color={C.blue}/><View style={{flex:1}}><Txt bold numberOfLines={2}>{e.title}</Txt><Txt size={12} color={C.muted}>{reminderLabel(e.reminderMinutes)} · {new Date(e.date).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})} {formatTime(e.date,timeFormat)}</Txt></View></View>)}</>
+ :<EmptyState title="No reminders yet" body="Add a reminder when you schedule an interview, deadline or follow-up, and it will appear here." action={{label:'Open Calendar',onPress:()=>goTab('calendar')}}/>}
+ </ScrollView>}
 function SettingsSection({title,children}:{title:string,children:React.ReactNode}){return <View style={{gap:9}}><Txt size={17} bold style={{letterSpacing:-0.2}}>{title}</Txt>{children}</View>}
 function SettingsDivider(){return <View style={{height:1,backgroundColor:C.line,marginLeft:56}}/>}
 function SettingsIcon({name,children}:{name:string,children?:React.ReactNode}){return <View style={{width:42,height:42,borderRadius:22,backgroundColor:C.pale,alignItems:'center',justifyContent:'center'}}>{children||<Icon name={name} size={21} color={C.blue}/>}</View>}
@@ -52,7 +65,7 @@ export function SettingsScreen(){
  const downloadTask=useRef<import('expo-file-system/legacy').DownloadResumable|null>(null),cancelRequested=useRef(false);
  const [refreshing,setRefreshing]=useState(false),[model,setModel]=useState(''),[projector,setProjector]=useState(''),[vision,setVision]=useState(false),[setupStage,setSetupStage]=useState<ModelSetupStage|null>(null),[modelProgress,setModelProgress]=useState<number|null>(null),[name,setName]=useState(profile.name),[editingName,setEditingName]=useState(false),[result,setResult]=useState(''),[resultError,setResultError]=useState(false),[showModelFiles,setShowModelFiles]=useState(false);
  useEffect(()=>{void Promise.all([modelPath(),visionProjectorPath()]).then(([m,p])=>{setModel(m);setProjector(p);});},[]);
- async function importModel(){let imported='';setResult('');setResultError(false);setSetupStage('choose-model');try{const uri=await pickModel();if(!uri)return;imported=uri;setSetupStage('import-model');const [oldModel,oldProjector]=await Promise.all([modelPath(),visionProjectorPath()]);await configureModel(uri);if(oldModel&&oldModel!==uri)await deleteLocalFile(oldModel).catch(()=>{});if(oldProjector)await deleteLocalFile(oldProjector).catch(()=>{});setModel(uri);setProjector('');setVision(false);setResult('Model added. Test it once to check performance and image support.');}catch(e){if(imported)await deleteLocalFile(imported).catch(()=>{});setResult(`Couldn’t add the model. ${(e as Error).message}`);setResultError(true);}finally{setSetupStage(null);}}
+ async function importModel(){let imported='';setResult('');setResultError(false);setSetupStage('choose-model');try{const uri=await pickModel();if(!uri)return;imported=uri;setSetupStage('import-model');await inspectModel(uri);const [oldModel,oldProjector]=await Promise.all([modelPath(),visionProjectorPath()]);await configureModel(uri);if(oldModel&&oldModel!==uri)await deleteLocalFile(oldModel).catch(()=>{});if(oldProjector)await deleteLocalFile(oldProjector).catch(()=>{});setModel(uri);setProjector('');setVision(false);setResult('Model added. Test it once to check performance and image support.');}catch(e){if(imported)await deleteLocalFile(imported).catch(()=>{});setResult(`Couldn’t add the model. ${(e as Error).message}`);setResultError(true);}finally{setSetupStage(null);}}
  async function importProjector(){let imported='';setResult('');setResultError(false);setSetupStage('choose-projector');try{const uri=await pickVisionProjector();if(!uri)return;imported=uri;setSetupStage('import-projector');const oldProjector=await visionProjectorPath();await configureVisionProjector(uri);if(oldProjector&&oldProjector!==uri)await deleteLocalFile(oldProjector).catch(()=>{});setProjector(uri);setVision(false);setResult('Vision projector added. Test the model to check image support.');}catch(e){if(imported)await deleteLocalFile(imported).catch(()=>{});setResult(`Couldn’t add the vision projector. ${(e as Error).message}`);setResultError(true);}finally{setSetupStage(null);}}
  async function downloadModel(entry:CatalogModel){
   cancelRequested.current=false;setResult('');setResultError(false);setModelProgress(0);setSetupStage('download-model');
@@ -60,6 +73,8 @@ export function SettingsScreen(){
   try{
    downloaded=await downloadCatalogBundle(entry,p=>setModelProgress(Math.round(p*100)),t=>{downloadTask.current=t;if(t&&cancelRequested.current)void t.cancelAsync();});
    if(!downloaded){setResult('Download canceled. Your current model is unchanged.');return;}
+   // Header + architecture before switching: a truncated or wrong file fails here, not mid-chat.
+   const info=await inspectModel(downloaded.modelUri);if(info.architecture!=='qwen3vl')throw new Error(`Expected a Qwen3-VL model but found “${info.architecture}”.`);
    [previousModel,previousProjector]=await Promise.all([modelPath(),visionProjectorPath()]);
    await configureModel(downloaded.modelUri,downloaded.projectorUri);switched=true;
    setSetupStage('load-model');setModelProgress(0);
@@ -68,7 +83,8 @@ export function SettingsScreen(){
    if(previousModel&&previousModel!==downloaded.modelUri)await deleteLocalFile(previousModel).catch(()=>{});
    if(previousProjector&&previousProjector!==downloaded.projectorUri)await deleteLocalFile(previousProjector).catch(()=>{});
    setModel(downloaded.modelUri);setProjector(downloaded.projectorUri);setVision(true);
-   setResult(`Ready for text and images · ${(benchmark.loadMs/1000).toFixed(1)} s load · ${benchmark.tokensPerSec.toFixed(1)} tokens/s`);
+   const seen=await visionCheck().catch(e=>({passed:false,label:`image check failed: ${(e as Error).message}`}));
+   setResult(`Ready for text and images · ${(benchmark.loadMs/1000).toFixed(1)} s load · ${benchmark.tokensPerSec.toFixed(1)} tokens/s · ${seen.label}`);setResultError(!seen.passed);
   }catch(e){
    if(switched)await configureModel(previousModel,previousProjector).catch(()=>{});
    if(downloaded){await deleteLocalFile(downloaded.modelUri).catch(()=>{});await deleteLocalFile(downloaded.projectorUri).catch(()=>{});}
@@ -81,7 +97,7 @@ export function SettingsScreen(){
   void downloadModel(entry);
  }
  function cancelDownload(){cancelRequested.current=true;void downloadTask.current?.cancelAsync();}
- async function testModel(){setResult('');setResultError(false);setModelProgress(0);setSetupStage('load-model');try{const r=await benchmarkModel(p=>setModelProgress(Math.max(0,Math.min(100,Math.round(p)))),()=>{setSetupStage('check-model');setModelProgress(null);});const hasVision=await supportsVision();setVision(hasVision);setResult(`Ready · ${(r.loadMs/1000).toFixed(1)} s load · ${r.tokensPerSec.toFixed(1)} tokens/s · ${hasVision?'images supported':projector?'projector unsupported':'text only'}`);}catch(e){setResult(`Model setup failed. ${(e as Error).message}`);setResultError(true);}finally{setSetupStage(null);}}
+ async function testModel(){setResult('');setResultError(false);setModelProgress(0);setSetupStage('load-model');try{const r=await benchmarkModel(p=>setModelProgress(Math.max(0,Math.min(100,Math.round(p)))),()=>{setSetupStage('check-model');setModelProgress(null);});const hasVision=await supportsVision();setVision(hasVision);const seen=hasVision?await visionCheck().catch(e=>({passed:false,label:`image check failed: ${(e as Error).message}`})):null;setResult(`Ready · ${(r.loadMs/1000).toFixed(1)} s load · ${r.tokensPerSec.toFixed(1)} tokens/s · ${seen?seen.label:projector?'projector unsupported':'text only'}`);setResultError(!!seen&&!seen.passed);}catch(e){setResult(`Model setup failed. ${(e as Error).message}`);setResultError(true);}finally{setSetupStage(null);}}
  const recommended=MODEL_CATALOG[0],recommendedInstalled=!!model&&model.includes(recommended.id),visionBundleInstalled=recommendedInstalled&&!!projector;
  return <ScrollView contentContainerStyle={{paddingHorizontal:18,paddingTop:12,paddingBottom:bottomClearance+10,gap:20}}>
   <View style={{gap:3,marginBottom:2}}><Heading>Settings</Heading><Txt size={15} color={C.muted}>Manage Brief and personalize your experience.</Txt></View>
@@ -124,6 +140,7 @@ export function SettingsScreen(){
     {!!result&&<Txt size={12} color={resultError?C.danger:C.green}>{result}</Txt>}
    </Card>
   </SettingsSection>
+  <SettingsSection title="Voice interviews"><VoiceSettings/></SettingsSection>
   <SettingsSection title="Preferences">
    <Card style={{paddingHorizontal:12,paddingVertical:2}}>
     <View style={{minHeight:70,flexDirection:'row',alignItems:'center',gap:12}}><SettingsIcon name="cash-outline"/><View style={{flex:1,gap:2}}><Txt size={14} bold>Salary currency</Txt><Txt size={12} color={C.muted}>Currency used for salary display</Txt></View><PullDownMenu label="Salary currency" value={currency} options={CURRENCIES} onChange={c=>void setCurrency(c)}/></View>
@@ -133,6 +150,7 @@ export function SettingsScreen(){
     <View style={{minHeight:66,flexDirection:'row',alignItems:'center',gap:12}}><SettingsIcon name="stats-chart-outline"/><View style={{flex:1,gap:2}}><Txt size={14} bold>Exchange rates</Txt><Txt size={12} color={fxError&&!fx?C.danger:C.muted}>{fx?`ECB rates · ${fx.rates.date}${fxError?' · Update unavailable':''}`:fxError||'Getting exchange rates…'}</Txt></View><Tap accessibilityRole="button" disabled={refreshing} onPress={()=>{setRefreshing(true);void refreshFx().finally(()=>setRefreshing(false));}} style={{minHeight:44,justifyContent:'center',paddingHorizontal:4}}><Txt size={14} bold color={C.blue}>{refreshing?'Updating…':'Update'}</Txt></Tap></View>
    </Card>
   </SettingsSection>
+  <SettingsSection title="Diagnostics"><PerfPanel/></SettingsSection>
   <SettingsSection title="Support & About">
    <Card style={{paddingHorizontal:12,paddingVertical:2}}>
     <Tap accessibilityRole="button" onPress={()=>go('notifications')} style={{minHeight:52,flexDirection:'row',alignItems:'center',gap:12}}><Icon name="notifications-outline" size={20}/><Txt size={14} style={{flex:1}}>Notifications</Txt><Icon name="chevron-forward" size={17} color={C.muted}/></Tap>

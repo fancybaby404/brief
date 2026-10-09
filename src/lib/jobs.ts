@@ -70,14 +70,30 @@ export class JobsError extends Error {
   constructor(kind: 'offline' | 'server', message: string) { super(message); this.kind = kind; }
 }
 
-export async function fetchRemoteJobs(query = '', filters: JobFilters = DEFAULT_FILTERS): Promise<RemoteJob[]> {
-  const url = jobsUrl(query, filters);
+/** One Jobicy request, unfiltered (type/level/salary/posted are applied on-device, so they never need a refetch).
+ *  Times out after 15 s; an aborted request rejects with an AbortError. */
+export async function fetchJobicy(url: string, signal?: AbortSignal): Promise<RemoteJob[]> {
+  const timeout = new AbortController(), t = setTimeout(() => timeout.abort(), 15000);
+  signal?.addEventListener('abort', () => timeout.abort());
   let r: Response;
-  try { r = await fetch(url, { headers: { Accept: 'application/json' } }); }
-  catch { throw new JobsError('offline', 'Job discovery needs an internet connection. Your saved jobs still work offline.'); }
+  try { r = await fetch(url, { headers: { Accept: 'application/json' }, signal: timeout.signal }); }
+  catch (e) {
+    if (signal?.aborted) throw e;
+    throw new JobsError('offline', timeout.signal.aborted ? 'Jobicy took too long to respond. Check your connection and try again.' : 'Job discovery needs an internet connection. Your saved jobs still work offline.');
+  } finally { clearTimeout(t); }
   if (!r.ok) throw new JobsError('server', `Jobicy isn’t responding right now (HTTP ${r.status}). Try again in a moment.`);
   let data: any;
   try { data = await r.json(); } catch { throw new JobsError('server', 'Jobicy sent an unreadable response. Try again in a moment.'); }
   if (data.success === false) throw new JobsError('server', data.error || 'Jobicy couldn’t load jobs right now.');
-  return applyFilters((Array.isArray(data.jobs) ? data.jobs : []).map(mapJobicyJob), filters);
+  return (Array.isArray(data.jobs) ? data.jobs : []).map(mapJobicyJob);
+}
+
+/** Cached listings count as fresh for 15 minutes; older ones are shown at once and refreshed in the background. */
+export const JOBS_FRESH_MS = 15 * 60 * 1000;
+export const freshness = (fetchedAt: number | undefined, now = Date.now()) => (fetchedAt === undefined ? 'none' : now - fetchedAt < JOBS_FRESH_MS ? 'fresh' : 'stale');
+/** What decides a server request: the URL (geo, industry, keywords). Client-side filters are not part of it. */
+export const jobsCacheKey = (query: string, f: JobFilters) => 'jobs:' + jobsUrl(query, f);
+
+export async function fetchRemoteJobs(query = '', filters: JobFilters = DEFAULT_FILTERS): Promise<RemoteJob[]> {
+  return applyFilters(await fetchJobicy(jobsUrl(query, filters)), filters);
 }
