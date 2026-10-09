@@ -30,6 +30,26 @@
 
 Every interactive screen: blank/no data, permission denied, loading, AI model missing, AI model out of memory, OCR confidence low, offline API failure, invalid URL/salary missing, date conflict/timezone, keyboard/scroll, small phones, large Dynamic Type, dark mode later, screen reader and reduce motion.
 
+### Implemented state matrix (components in `src/components/States.tsx`)
+
+Every state says what happened, why, and offers the next step. Mascot mood signals tone: happy = fresh start, question = nothing found / not set up, sad = offline, error (x_x) = something broke.
+
+| Situation | Where | State |
+|---|---|---|
+| No applications | Home (card), Applications, Mock picker | Happy mascot, "Add a job" + "Explore jobs" |
+| Search finds nothing | Applications, Explore | Question mascot, Clear search / Reset filters |
+| Offline | Explore (`JobsError` kind `offline`) | Sad mascot, Try again + "Open my saved jobs" |
+| Provider error | Explore (kind `server`) | Error mascot, Try again |
+| Loading jobs | Explore | Pulsing skeleton cards (static with Reduce Motion) |
+| No AI model | Ask Brief, Mock picker & session | `ModelSetupCard` up front, composer disabled, Open Settings; Add Job keeps OCR text and links to setup |
+| AI generating | Ask Brief, Mock | `ThinkingBubble` + header mascot in "question" mood |
+| AI failed | Ask Brief, Mock | `InlineError` with Try again (re-asks without re-saving the message) |
+| No resume | Resume, Mock picker hint | Question mascot, Upload resume / Enter details instead (form sheet) |
+| Nothing scheduled | Calendar | Happy mascot, Add event |
+| No notifications | Notifications | Honest "no reminders yet", Open Calendar |
+| Screenshot import | Add Job | Step labels (reading text → filling details), inline retry on failure |
+| Storage can't open | App start | Error mascot, data-is-safe message, Try again (re-runs SQLite init) |
+
 ## Navigation map
 
 `Home -> See all -> Application detail -> Ask Brief/Mock`, `Jobs -> Job detail -> Save to tracker`, `Plus -> Add Job / Ask Brief`, `Calendar -> event`, `Mock -> job select -> session`, `Account -> Resume/Notifications/Settings`, `Onboarding -> Home`.

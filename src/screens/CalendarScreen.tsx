@@ -1,5 +1,5 @@
 import React,{useMemo,useState} from 'react';import {Alert,ScrollView,View} from 'react-native';
-import {useBrief} from '../lib/appContext';import {C} from '../theme/tokens';import {Card,Field,Heading,Icon,Primary,SectionTitle,Txt,Tap} from '../components/Ui';import {uid} from '../lib/db';
+import {useBrief} from '../lib/appContext';import {C} from '../theme/tokens';import {Card,Field,Heading,Icon,Primary,SectionTitle,Txt,Tap} from '../components/Ui';import {uid} from '../lib/db';import {EmptyState} from '../components/States';
 export function CalendarScreen(){const {events,applications,putEvent,removeEvent}=useBrief();const [month,setMonth]=useState(new Date().getMonth()),[year,setYear]=useState(new Date().getFullYear()),[day,setDay]=useState(new Date().getDate()),[adding,setAdding]=useState(false),[title,setTitle]=useState(''),[time,setTime]=useState('10:00'),[notes,setNotes]=useState('');
  const first=new Date(year,month,1).getDay(),length=new Date(year,month+1,0).getDate();const cells=[...Array(first).fill(0),...Array.from({length},(_,i)=>i+1)];
  const selected=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
@@ -14,7 +14,7 @@ export function CalendarScreen(){const {events,applications,putEvent,removeEvent
  </View></Card>
  <SectionTitle right="Add event" onRight={()=>setAdding(!adding)}>Upcoming events</SectionTitle>
  {adding&&<Card><Txt bold>New event · {selected}</Txt><Field label="Event" value={title} onChangeText={setTitle} placeholder="Interview with..."/><Field label="Time (24h HH:MM)" value={time} onChangeText={setTime}/><Field label="Notes" value={notes} onChangeText={setNotes}/><Primary label="Save event" onPress={()=>void add()}/></Card>}
- {upcoming.filter(e=>e.date.slice(0,10)>=new Date().toISOString().slice(0,10)).length===0&&<Card><Txt color={C.muted}>No upcoming events yet. Add interviews and deadlines to keep track.</Txt></Card>}
+ {!adding&&upcoming.filter(e=>e.date.slice(0,10)>=new Date().toISOString().slice(0,10)).length===0&&<EmptyState card compact title="Nothing scheduled" body="Add interviews, follow-ups and deadlines so nothing sneaks up on you." action={{label:'Add event',onPress:()=>setAdding(true)}}/>}
  {upcoming.filter(e=>e.date.slice(0,10)>=new Date().toISOString().slice(0,10)).map(e=><Tap key={e.id} onLongPress={()=>Alert.alert('Delete event?',e.title,[{text:'Cancel'},{text:'Delete',style:'destructive',onPress:()=>void removeEvent(e.id)}])} style={{flexDirection:'row',gap:12,alignItems:'center',borderRadius:17,backgroundColor:C.white,padding:13,borderWidth:1,borderColor:C.line}}><View style={{width:45,alignItems:'center'}}><Txt size={10} color={C.blue}>{new Date(e.date).toLocaleDateString('en-US',{month:'short'}).toUpperCase()}</Txt><Txt size={23} bold>{new Date(e.date).getDate()}</Txt></View><View style={{flex:1}}><Txt bold>{e.title}</Txt><Txt color={C.muted} size={12}>{e.date.replace('T',' · ').slice(0,16)}</Txt><Txt color={C.muted} size={11}>{e.notes}</Txt></View><Icon name="calendar-outline" color={C.blue}/></Tap>)}
  </ScrollView>;
 }

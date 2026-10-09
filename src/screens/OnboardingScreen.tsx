@@ -1,12 +1,13 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {ActivityIndicator,Alert,Animated,BackHandler,Easing,ScrollView,Switch,Text,View,useWindowDimensions,type DimensionValue} from 'react-native';
+import {ActivityIndicator,Alert,Animated,BackHandler,ScrollView,Switch,Text,View,useWindowDimensions,type DimensionValue} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useBrief,type AddJobIntent} from '../lib/appContext';
 import {C} from '../theme/tokens';
 import {CloudHalo,CompanyLogo,Icon,Mascot,Primary,Sparkles,Tap,Txt,Wordmark,useReducedMotion} from '../components/Ui';
 import {ProfileForm} from '../components/ProfileForm';
 import {LiveMascot} from '../components/LiveMascot';
-import {deleteLocalFile,pickResume,readResumeText} from '../lib/imports';
+import {TypingDots} from '../components/States';
+import {importResume} from '../lib/imports';
 import {hasProfileDetails,listItems} from '../lib/profile';
 import type {Profile} from '../types';
 
@@ -80,12 +81,6 @@ function ResumeArt({p}:{p:Profile}){
  </View>;
 }
 
-function TypingDots(){
- const reduce=useReducedMotion();const t=useRef(new Animated.Value(0)).current;
- useEffect(()=>{if(reduce)return;const loop=Animated.loop(Animated.timing(t,{toValue:1,duration:1300,easing:Easing.linear,useNativeDriver:true}));loop.start();return ()=>{loop.stop();t.setValue(0);};},[reduce]);
- return <View style={{flexDirection:'row',gap:6}}>{[0,1,2].map(i=><Animated.View key={i} style={{width:7,height:7,borderRadius:4,backgroundColor:C.blue,opacity:reduce?0.8:t.interpolate({inputRange:[0,0.15+i*0.15,0.4+i*0.15,1],outputRange:[0.3,1,0.3,0.3]})}}/>)}</View>;
-}
-
 function PracticeArt(){
  return <View style={{height:144,flexDirection:'row',alignItems:'flex-end'}} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
  <View><CloudHalo size={150}><Mascot size={108}/></CloudHalo><View style={{position:'absolute',left:-2,top:4}}><Sparkles size={36}/></View></View>
@@ -119,15 +114,9 @@ export function OnboardingScreen(){
  async function upload(){
   setBusy(true);
   try{
-   const uri=await pickResume();if(!uri)return;
-   let text='',note='';
-   if(uri.endsWith('.pdf')){
-    try{text=await readResumeText(uri);}catch{note='Your PDF is saved, but its text couldn’t be read on this device.';}
-    if(!text&&!note)note='This PDF looks scanned, so there’s no text to read.';
-   }else note='Your DOCX is saved. Reading DOCX text isn’t supported yet.';
-   if(profile.resumeUri&&profile.resumeUri!==uri)await deleteLocalFile(profile.resumeUri);
-   await updateProfile({...profile,resumeUri:uri,resumeText:text,useResumeForAI:true});
-   if(note)Alert.alert('Resume added',`${note} Add a few details so Brief can use them.`,[{text:'Later',style:'cancel'},{text:'Enter details',onPress:()=>setEditing(true)}]);
+   const r=await importResume(profile.resumeUri);if(!r)return;
+   await updateProfile({...profile,resumeUri:r.resumeUri,resumeText:r.resumeText,useResumeForAI:true});
+   if(r.note)Alert.alert('Resume added',`${r.note} Add a few details so Brief can use them.`,[{text:'Later',style:'cancel'},{text:'Enter details',onPress:()=>setEditing(true)}]);
   }catch(e){Alert.alert('Couldn’t add resume',(e as Error).message);}
   finally{setBusy(false);}
  }

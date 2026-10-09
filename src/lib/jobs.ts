@@ -35,13 +35,20 @@ export function jobsUrl(query: string, f: JobFilters) {
 export const filterByType = (jobs: RemoteJob[], type: JobFilters['type']) =>
   type ? jobs.filter(j => j.employmentType.split(', ').includes(type)) : jobs;
 
+/** 'offline' = the request never reached the provider; 'server' = it answered with a failure. Screens show different states. */
+export class JobsError extends Error {
+  kind: 'offline' | 'server';
+  constructor(kind: 'offline' | 'server', message: string) { super(message); this.kind = kind; }
+}
+
 export async function fetchRemoteJobs(query = '', filters: JobFilters = DEFAULT_FILTERS): Promise<RemoteJob[]> {
   const url = jobsUrl(query, filters);
   let r: Response;
   try { r = await fetch(url, { headers: { Accept: 'application/json' } }); }
-  catch { throw new Error("You're offline. Job discovery needs internet; your saved jobs still work."); }
-  if (!r.ok) throw new Error(`Job discovery unavailable (HTTP ${r.status}). Your saved jobs still work offline.`);
-  const data = await r.json();
-  if (data.success === false) throw new Error(data.error || 'Could not load jobs');
+  catch { throw new JobsError('offline', 'Job discovery needs an internet connection. Your saved jobs still work offline.'); }
+  if (!r.ok) throw new JobsError('server', `Jobicy isn’t responding right now (HTTP ${r.status}). Try again in a moment.`);
+  let data: any;
+  try { data = await r.json(); } catch { throw new JobsError('server', 'Jobicy sent an unreadable response. Try again in a moment.'); }
+  if (data.success === false) throw new JobsError('server', data.error || 'Jobicy couldn’t load jobs right now.');
   return filterByType((Array.isArray(data.jobs) ? data.jobs : []).map(mapJobicyJob), filters.type);
 }

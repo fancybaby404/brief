@@ -151,3 +151,28 @@ test('legacy "saved" applications load as "interested" (the two were merged)', (
   assert.equal(normalizeApplication(app({ status: 'saved' })).status, 'interested');
   assert.equal(normalizeApplication(app({ status: 'applied' })).status, 'applied');
 });
+
+// fetchRemoteJobs error kinds drive different empty states (offline vs provider trouble).
+async function withFetch(impl, fn) { const real = globalThis.fetch; globalThis.fetch = impl; try { await fn(); } finally { globalThis.fetch = real; } }
+
+test('fetchRemoteJobs reports offline when the request cannot be made', async () => {
+  const { fetchRemoteJobs } = await import('../src/lib/jobs.ts');
+  await withFetch(async () => { throw new TypeError('Network request failed'); }, () =>
+    assert.rejects(fetchRemoteJobs(''), e => e.kind === 'offline'));
+});
+
+test('fetchRemoteJobs reports a server problem for HTTP errors and API failures', async () => {
+  const { fetchRemoteJobs } = await import('../src/lib/jobs.ts');
+  await withFetch(async () => ({ ok: false, status: 503 }), () =>
+    assert.rejects(fetchRemoteJobs(''), e => e.kind === 'server' && /503/.test(e.message)));
+  await withFetch(async () => ({ ok: true, json: async () => ({ success: false, error: 'Invalid geo' }) }), () =>
+    assert.rejects(fetchRemoteJobs(''), e => e.kind === 'server'));
+});
+
+test('fetchRemoteJobs maps listings on success', async () => {
+  const { fetchRemoteJobs } = await import('../src/lib/jobs.ts');
+  await withFetch(async () => ({ ok: true, json: async () => ({ jobs: [jobicy] }) }), async () => {
+    const jobs = await fetchRemoteJobs('');
+    assert.equal(jobs[0].title, 'Software Engineer');
+  });
+});

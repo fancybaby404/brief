@@ -37,3 +37,15 @@ export async function readResumeText(uri:string):Promise<string> {
  return (await extractText(uri)).slice(0,14000);
 }
 export async function deleteLocalFile(uri:string) { if(uri) await FileSystem.deleteAsync(uri,{idempotent:true}); }
+/** Picks a resume, stores it privately, extracts digital-PDF text when possible, and removes a replaced file.
+ *  Returns the profile changes plus an honest note when text couldn't be read (DOCX / scanned PDF), or null if cancelled. */
+export async function importResume(currentUri:string):Promise<{resumeUri:string,resumeText:string,note:string}|null> {
+ const uri=await pickResume();if(!uri)return null;
+ let resumeText='',note='';
+ if(uri.endsWith('.pdf')){
+  try{resumeText=await readResumeText(uri);}catch{note='Your PDF is saved, but its text couldn’t be read on this device.';}
+  if(!resumeText&&!note)note='This PDF looks scanned, so there’s no text to read.';
+ }else note='Your DOCX is saved. Reading DOCX text isn’t supported yet.';
+ if(currentUri&&currentUri!==uri)await deleteLocalFile(currentUri);
+ return {resumeUri:uri,resumeText,note};
+}

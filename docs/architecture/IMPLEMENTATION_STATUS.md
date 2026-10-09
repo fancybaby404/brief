@@ -62,6 +62,14 @@
 - New faces from the user (SHOCKED, QUESTION, SAD, ERROR) cropped with pngjs to the exact `mascot-happy.png` frame (body bbox + 26 px; SAD's body is drawn 3 px left / 13 px higher, so its crop is offset to match). QUESTION's "???" was erased from the face and saved as `marks-question.png` so it can animate separately.
 - `LiveMascot`: all faces stay mounted (instant swaps, no first-decode flicker); press squish, escalating tap reactions, sparkle/??? marks, native-driver springs, timers cleaned up on unmount, screen-reader button with hint. `CloudHalo` now hides only its decorative puffs from accessibility so the mascot stays reachable.
 
+### 2026-10-09 — empty, loading and error states
+- `States.tsx`: `EmptyState` (LiveMascot mood + title + reason + actions), `JobsSkeleton`, `TypingDots`/`ThinkingBubble`, `InlineError` (retry), `ModelSetupCard`, `useModelInstalled`. Matrix in SCREEN_INVENTORY.
+- `fetchRemoteJobs` throws `JobsError` with `kind` 'offline' | 'server' (tested with a stubbed fetch), so Explore can say "You're offline" vs "Jobs couldn't load".
+- Ask Brief / Mock: setup card before any attempt when no model; composer disabled; retry re-asks for the last user message without duplicating it. Mock finish detection no longer relies on a flag argument.
+- Resume: real empty state; summary editing moved to the shared `ProfileForm` sheet; `importResume` shared with onboarding (honest notes for DOCX/scanned PDFs).
+- Add Job: OCR/AI progress steps, inline import errors with retry, non-blocking note when AI is missing or extraction fails (OCR text kept).
+- Startup: SQLite failure shows a recoverable error screen instead of an alert over a broken app.
+
 ## Next tasks in order
 1. **P0**: `scripts/setup.sh` + `npm run typecheck` + Android dev build; fix dependency APIs, permissions, runtime import errors, SafeArea/keyboard collisions, design bugs.
 2. **P0**: import/test Qwen Q4 GGUF on actual target phone; run airplane-mode chat and mock; reduce prompt/context memory footprint as needed.

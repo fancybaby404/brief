@@ -16,7 +16,8 @@ import {ChatScreen} from './src/screens/ChatScreen';
 import {ResumeScreen,SettingsScreen,NotificationsScreen} from './src/screens/AccountScreens';
 import {AddJobScreen} from './src/screens/AddJobScreen';
 import {OnboardingScreen} from './src/screens/OnboardingScreen';
-function Shell(){const {page,ready}=useBrief();
+import {EmptyState} from './src/components/States';
+function Shell(){const {page,ready,storageError,retryStorage}=useBrief();
  // Brand font loads with the database; if it fails the wordmark falls back to the system font.
  const [fontsLoaded,fontError]=useFonts({Fredoka_700Bold});
  // Explore stays mounted once visited so search, filters, results and scroll survive job detail and tab switches.
@@ -26,7 +27,8 @@ function Shell(){const {page,ready}=useBrief();
  const screens={home:<HomeScreen/>,applications:<ApplicationsScreen/>,jobs:null, 'job-detail':<JobDetailScreen/>, 'application-detail':<ApplicationDetailScreen/>,calendar:<CalendarScreen/>,mock:<MockScreen/>,chat:<ChatScreen/>,resume:<ResumeScreen/>,notifications:<NotificationsScreen/>,settings:<SettingsScreen/>,'add-job':<AddJobScreen/>,onboarding:<OnboardingScreen/>};
  return <SafeAreaView style={{flex:1,backgroundColor:C.background}} edges={['top','left','right']}>
  <StatusBar barStyle="dark-content" backgroundColor={C.background}/>
- {!ready||!(fontsLoaded||fontError)?<View style={{flex:1,justifyContent:'center'}}><ActivityIndicator size="large" color={C.blue}/></View>:<>
+ {!ready||!(fontsLoaded||fontError)?<View style={{flex:1,justifyContent:'center'}}><ActivityIndicator size="large" color={C.blue}/></View>
+ :storageError?<View style={{flex:1,justifyContent:'center',padding:20}}><EmptyState mood="error" title="Brief couldn’t open your data" body={`Your jobs are stored only on this phone and nothing has been deleted. Close other apps to free space, then try again. (${storageError})`} action={{label:'Try again',icon:'refresh',onPress:retryStorage}}/></View>:<>
  {hasTopHeader&&<Header plain={plainHeader}/>}
  {jobsVisited.current&&<View style={{flex:1,display:page==='jobs'?'flex':'none'}}><JobsScreen/></View>}
  {page!=='jobs'&&<View style={{flex:1}}>{screens[page]}</View>}

@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { C,R,SPRING } from '../theme/tokens';
 export function Icon({name,size=20,color=C.ink}:{name:string,size?:number,color?:string}) {return <Ionicons name={name as any} size={size} color={color}/>;}
-export function Txt({children,size=14,bold=false,color=C.ink,style,numberOfLines}:{children:React.ReactNode,size?:number,bold?:boolean,color?:string,style?:any,numberOfLines?:number}) {return <Text numberOfLines={numberOfLines} style={[{fontSize:size,fontWeight:bold?'700':'400',color,lineHeight:size*1.37},style]}>{children}</Text>}
+export function Txt({children,size=14,bold=false,color=C.ink,style,numberOfLines,selectable}:{children:React.ReactNode,size?:number,bold?:boolean,color?:string,style?:any,numberOfLines?:number,selectable?:boolean}) {return <Text selectable={selectable} numberOfLines={numberOfLines} style={[{fontSize:size,fontWeight:bold?'700':'400',color,lineHeight:size*1.37},style]}>{children}</Text>}
 /** Large titles get negative tracking, like SF Pro Display. */
 export function Heading({children}:{children:React.ReactNode}) {return <Txt size={27} bold style={{letterSpacing:-0.6,lineHeight:33}}>{children}</Txt>}
 export function Card({children,style}:{children:React.ReactNode,style?:StyleProp<ViewStyle>}) {return <View style={[{backgroundColor:C.white,borderRadius:R.card,padding:15,borderWidth:1,borderColor:C.line},style]}>{children}</View>}

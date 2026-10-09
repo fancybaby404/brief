@@ -4,7 +4,8 @@ import {useBrief} from '../lib/appContext';import {C} from '../theme/tokens';
 import {Card,CompanyLogo,Heading,Icon,Primary,Sheet,StatusPill,Tap,Txt} from '../components/Ui';
 import {SwipeAction} from '../components/SwipeAction';
 import {Description} from '../components/Description';
-import {fetchRemoteJobs,DEFAULT_FILTERS,JOBICY_CREDIT_URL,type JobFilters} from '../lib/jobs';import {uid} from '../lib/db';import type {Application,ApplicationStatus,RemoteJob} from '../types';
+import {EmptyState,JobsSkeleton} from '../components/States';
+import {fetchRemoteJobs,JobsError,DEFAULT_FILTERS,JOBICY_CREDIT_URL,type JobFilters} from '../lib/jobs';import {uid} from '../lib/db';import type {Application,ApplicationStatus,RemoteJob} from '../types';
 const REGIONS:{value:JobFilters['geo'],label:string,phrase:string}[]=[{value:'philippines',label:'Philippines',phrase:'the Philippines'},{value:'apac',label:'Asia-Pacific',phrase:'Asia-Pacific'},{value:'',label:'All regions',phrase:'any region'}];
 const TYPES:{value:JobFilters['type'],label:string}[]=[{value:'',label:'Any'},{value:'Full-Time',label:'Full-time'},{value:'Part-Time',label:'Part-time'},{value:'Contract',label:'Contract'}];
 const Credit=({filters}:{filters?:JobFilters})=><Tap accessibilityRole="link" onPress={()=>void Linking.openURL(JOBICY_CREDIT_URL)}><Txt color={C.muted} size={12}>{filters?`Remote jobs open to ${REGIONS.find(r=>r.value===filters.geo)!.phrase}${filters.type?' · '+TYPES.find(t=>t.value===filters.type)!.label:''} · `:'Listing from '}<Txt color={C.blue} size={12}>Jobicy</Txt></Txt></Tap>;
@@ -38,8 +39,8 @@ function JobCard({j,app,onOpen,onInterested,onUnmark}:{j:RemoteJob,app?:Applicat
  </View>}
  </Tap></SwipeAction>;
 }
-export function JobsScreen(){const {openJob,applications,putApp,removeApp}=useBrief();const [query,setQuery]=useState(''),[filters,setFilters]=useState<JobFilters>(DEFAULT_FILTERS),[draft,setDraft]=useState<JobFilters>(DEFAULT_FILTERS),[showFilters,setShowFilters]=useState(false),[jobs,setJobs]=useState<RemoteJob[]>([]),[loading,setLoading]=useState(false),[error,setError]=useState('');
- async function refresh(q=query,f=filters){setLoading(true);setError('');try{setJobs(await fetchRemoteJobs(q,f));}catch(e){setError((e as Error).message);}finally{setLoading(false)}}
+export function JobsScreen(){const {openJob,applications,putApp,removeApp,go}=useBrief();const [query,setQuery]=useState(''),[filters,setFilters]=useState<JobFilters>(DEFAULT_FILTERS),[draft,setDraft]=useState<JobFilters>(DEFAULT_FILTERS),[showFilters,setShowFilters]=useState(false),[jobs,setJobs]=useState<RemoteJob[]>([]),[loading,setLoading]=useState(false),[error,setError]=useState<JobsError|null>(null);
+ async function refresh(q=query,f=filters){setLoading(true);setError(null);try{setJobs(await fetchRemoteJobs(q,f));}catch(e){setError(e instanceof JobsError?e:new JobsError('server',(e as Error).message));setJobs([]);}finally{setLoading(false)}}
  useEffect(()=>{void refresh();},[]);
  const filtered=filters.geo!==DEFAULT_FILTERS.geo||filters.type!==DEFAULT_FILTERS.type;
  function apply(f:JobFilters){setShowFilters(false);setFilters(f);void refresh(query,f);}
@@ -54,10 +55,11 @@ export function JobsScreen(){const {openJob,applications,putApp,removeApp}=useBr
  <Tap accessibilityRole="button" accessibilityLabel={filtered?'Filters, changed':'Filters'} onPress={()=>{setDraft(filters);setShowFilters(true);}} style={{width:46,height:46,borderRadius:14,backgroundColor:C.pale2,alignItems:'center',justifyContent:'center'}}><Icon name="options-outline" size={20} color={C.ink}/>{filtered&&<View style={{position:'absolute',top:10,right:10,width:7,height:7,borderRadius:4,backgroundColor:C.blue}}/>}</Tap>
  </View>
  <Credit filters={filters}/>
- {!usedSwipe&&jobs.length>0&&!loading&&<View style={{flexDirection:'row',alignItems:'center',gap:6}}><Icon name="hand-left-outline" size={14} color={C.muted}/><Txt size={12} color={C.muted}>Swipe left on a job to mark it as interested</Txt></View>}
- {loading&&<ActivityIndicator size="large" color={C.blue} style={{marginTop:8}}/>}
- {!!error&&<Card style={{gap:10}}><Txt color={C.danger}>{error}</Txt><Primary label="Try again" onPress={()=>void refresh()} secondary/></Card>}
- {!loading&&!error&&jobs.length===0&&<Card style={{gap:10}}><Txt color={C.muted}>No jobs match{query?` “${query}”`:''} with these filters.</Txt>{filtered&&<Primary secondary label="Reset filters" onPress={()=>apply(DEFAULT_FILTERS)}/>}</Card>}
+ {!usedSwipe&&jobs.length>0&&!loading&&!error&&<View style={{flexDirection:'row',alignItems:'center',gap:6}}><Icon name="hand-left-outline" size={14} color={C.muted}/><Txt size={12} color={C.muted}>Swipe left on a job to mark it as interested</Txt></View>}
+ {loading&&<JobsSkeleton/>}
+ {!loading&&error?.kind==='offline'&&<EmptyState mood="sad" title="You’re offline" body={error.message} action={{label:'Try again',icon:'refresh',onPress:()=>void refresh()}} secondary={applications.length?{label:'Open my saved jobs',onPress:()=>go('applications')}:undefined}/>}
+ {!loading&&error?.kind==='server'&&<EmptyState mood="error" title="Jobs couldn’t load" body={error.message} action={{label:'Try again',icon:'refresh',onPress:()=>void refresh()}}/>}
+ {!loading&&!error&&jobs.length===0&&<EmptyState mood="question" title="No jobs found" body={`Nothing matches${query?` “${query.trim()}”`:''}${filtered?' with these filters':''} right now. Jobicy lists recent remote jobs, so try a broader keyword.`} action={filtered?{label:'Reset filters',onPress:()=>apply(DEFAULT_FILTERS)}:undefined} secondary={query?{label:'Clear search',onPress:()=>{setQuery('');void refresh('');}}:undefined}/>}
  {!loading&&jobs.map(j=><JobCard key={j.id} j={j} app={byUrl.get(j.url)} onOpen={()=>openJob(j)} onInterested={()=>void markInterested(j)} onUnmark={()=>unmark(byUrl.get(j.url)!)}/>)}
  </ScrollView>
  <Sheet visible={showFilters} onClose={()=>setShowFilters(false)} title="Filters"><View style={{gap:18}}>

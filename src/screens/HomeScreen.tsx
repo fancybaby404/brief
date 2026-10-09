@@ -5,8 +5,9 @@ import {Card,CloudHalo,CompanyLogo,Icon,SectionTitle,StatusPill,Tap,Txt} from '.
 import {C} from '../theme/tokens';
 import {ProgressChart} from '../components/ProgressChart';
 import {LiveMascot} from '../components/LiveMascot';
+import {EmptyState} from '../components/States';
 const greeting=()=>{const h=new Date().getHours();return h<12?'Good morning,':h<18?'Good afternoon,':'Good evening,';};
-export function HomeScreen(){const {profile,applications,go,openApp,openChat}=useBrief();
+export function HomeScreen(){const {profile,applications,go,goTab,openApp,openChat}=useBrief();
  return <ScrollView contentContainerStyle={{paddingHorizontal:18,paddingBottom:115,gap:19}}>
  <View style={{flexDirection:'row',gap:12,alignItems:'center',marginTop:6}}>
  <CloudHalo size={150}><LiveMascot size={104}/></CloudHalo>
@@ -16,7 +17,7 @@ export function HomeScreen(){const {profile,applications,go,openApp,openChat}=us
  </Tap></View>
  <ProgressChart applications={applications}/>
  <View><SectionTitle right="See all" onRight={()=>go('applications')}>Recent applications</SectionTitle>
- {applications.length===0?<Card><Txt color={C.muted}>No applications yet. Tap + to add a job from a screenshot, link, or manually.</Txt></Card>:applications.slice(0,5).map(a=><Tap key={a.id} accessibilityRole="button" onPress={()=>openApp(a)} style={{backgroundColor:C.white,borderRadius:17,padding:13,marginBottom:7,flexDirection:'row',alignItems:'center',gap:10,borderColor:C.line,borderWidth:1}}>
+ {applications.length===0?<EmptyState card compact title="Your job hunt starts here" body="Add a job from a screenshot, a photo, or by hand — or browse remote jobs open to the Philippines." action={{label:'Add your first job',onPress:()=>go('add-job')}} secondary={{label:'Explore jobs',onPress:()=>goTab('jobs')}}/>:applications.slice(0,5).map(a=><Tap key={a.id} accessibilityRole="button" onPress={()=>openApp(a)} style={{backgroundColor:C.white,borderRadius:17,padding:13,marginBottom:7,flexDirection:'row',alignItems:'center',gap:10,borderColor:C.line,borderWidth:1}}>
  <CompanyLogo uri={a.logoUrl} size={38}/>
  <View style={{flex:1}}><Txt bold size={13}>{a.company}</Txt><Txt size={11} color={C.muted} style={{flexShrink:1}}>{a.title}</Txt></View><StatusPill status={a.status}/><Icon name="chevron-forward" color={C.soft} size={16}/>
   </Tap>)}</View>
