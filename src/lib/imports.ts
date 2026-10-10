@@ -141,7 +141,11 @@ export async function probeImageUri():Promise<string> {
   const asset=Asset.fromModule(require('../../assets/mascot-happy.png'));
   await asset.downloadAsync();
   if(!asset.localUri)throw new Error('The test image is unavailable.');
-  return asset.localUri;
+  if(asset.localUri.includes(':'))return asset.localUri;
+  // Release Android builds embed images as drawable resources (a bare name, not a file); llama.rn needs a real path.
+  const dest=`${FileSystem.cacheDirectory}brief-vision-probe.png`;
+  await FileSystem.copyAsync({from:asset.localUri,to:dest});
+  return dest;
 }
 
 export async function readResumeText(uri:string):Promise<string> {

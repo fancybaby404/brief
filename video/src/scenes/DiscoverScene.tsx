@@ -16,9 +16,10 @@ export const DiscoverScene: React.FC = () => {
     <AbsoluteFill style={{ backgroundColor: "#F8FBFF" }}>
       <PhoneFrame
         name="Explore clip"
-        durationInFrames={130}
+        durationInFrames={165}
+        trimBefore={3 * fps}
         premountFor={fps}
-        src=""
+        src="explore.mp4"
         label="explore.mp4"
         style={{
           left: 280,
@@ -36,15 +37,19 @@ export const DiscoverScene: React.FC = () => {
       />
       <PhoneFrame
         name="Add job clip"
-        from={130}
+        from={165}
+        trimBefore={2 * fps}
+        durationInFrames={234}
+        playbackRate={2}
         premountFor={fps}
-        src=""
+        src="addjob.mp4"
         label="addjob.mp4"
+        speedLabel="Sped up 2×"
         style={{ left: 280, top: 101 }}
       />
       <Headline
         name="Swipe headline"
-        durationInFrames={130}
+        durationInFrames={165}
         premountFor={fps}
         style={{ left: 880 }}
       >
@@ -52,7 +57,7 @@ export const DiscoverScene: React.FC = () => {
       </Headline>
       <Headline
         name="Snap headline"
-        from={130}
+        from={165}
         premountFor={fps}
         style={{ left: 880 }}
       >

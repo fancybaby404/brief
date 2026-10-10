@@ -45,13 +45,11 @@ export const RemotionRoot: React.FC = () => {
           width={1920}
           height={1080}
           defaultProps={{
-            src: "",
+            src: "onboarding.mp4",
             label: "home.mp4",
-            aspect: 0.45,
-            statusBarHeight: 36,
             muted: true,
             speedLabel: "",
-            style: { left: 755, top: 101 },
+            style: { left: 750, top: 101 },
           }}
         />
         <Composition

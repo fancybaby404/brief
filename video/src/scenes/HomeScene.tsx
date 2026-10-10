@@ -20,8 +20,9 @@ export const HomeScene: React.FC = () => {
       </Headline>
       <PhoneFrame
         name="Home clip"
+        trimBefore={6 * fps}
         premountFor={fps}
-        src=""
+        src="onboarding.mp4"
         label="home.mp4"
         style={{
           left: 1230,

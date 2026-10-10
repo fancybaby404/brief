@@ -19,7 +19,7 @@ Status: planned, not built. Read with `HANDOFF.md` (tooling) and the product doc
 2. End-card CTA: **"Coming soon"** (no store badge — the app is not released).
 3. Persona: **Jade Santos**, BS Information Technology '26, Manila. Targets: Junior Frontend Developer, Associate Product Designer, QA Analyst.
 4. Data: entered by hand in the app on the phone. The progress chart only shows real dates, so jobs marked applied on recording day all land in the current week. Accept that, or spread the entry over a few days before recording Home.
-5. Music: royalty-free bed supplied by the user (TBD).
+5. Music: user-supplied `vids/bgmusic.mp3` → `public/music/bed.mp3` (138 s, no loop), volume ~0.13 with a 1 s fade-in and 2 s fade-out.
 
 ## Claims we may and may not make
 
@@ -43,10 +43,10 @@ Status: planned, not built. Read with `HANDOFF.md` (tooling) and the product doc
 | 5 | 0:26–0:33.5 | 222 | Track | Clip `track`: application detail → status sheet → Interview → "Schedule it" → event sheet → Calendar marker | Interviews, sorted | "Statuses, notes and interviews stay together, and land right on her calendar." | switch on status pick |
 | 6 | 0:33–0:40.5 | 222 | Ask Brief | Clip `resume` (~2 s resume summary) → clip `ask`: question about a role, streamed answer, follow-up chips | Knows your resume | "Unsure about a role? She asks Brief, which already knows her resume." | — |
 | 7 | 0:40–0:50.5 | 312 | Mock interview | Clip `mock`: picker "Who are you interviewing for?" → voice session (real mic-level ring, spoken question) → feedback card with scores | Practice out loud | "Then she practices out loud. Brief plays the interviewer, listens, and gives honest feedback." | ding on feedback card |
-| 8 | 0:50–0:55.5 | 162 | Privacy proof | Clip `offline`: airplane mode on, Ask Brief still answers; chips Local LLM · Whisper · KittenTTS · OCR — "all on-device" | Works in airplane mode | "Her resume, chats and interviews never leave her phone." | switch on airplane toggle |
+| 8 | 0:50–0:55.5 | 162 | Privacy proof | Pure graphic — no footage (offline clip dropped): headline + chips Local LLM · Whisper · KittenTTS · On-device OCR | Your data stays yours | "Her resume, chats and interviews never leave her phone." | — |
 | 9 | 0:55–1:00 | 147 | Outro (graphic) | Mascot happy hop, wordmark, tagline, "Coming soon" | Job hunting, made lighter. | "Brief. Job hunting, made lighter." | one soft ding |
 
-Coverage: Onboarding (2), Home (3), Explore + Add Job + OCR (4), Application detail + status + events + Calendar (5), Resume + Ask Brief (6), Mock voice + feedback (7), Settings → Brief AI + offline (8).
+Coverage: Onboarding (2), Home (3), Explore + Add Job + OCR (4), Application detail + status + events + Calendar (5), Resume + Ask Brief (6), Mock voice + feedback (7), on-device chips (8).
 
 Fallback for scene 7: if voice capture fails on device, record the typed mock and change the line to "…practices with a mock interview built from the job post, and gets honest feedback."
 
@@ -112,7 +112,7 @@ Drop the files in `video/public/clips/raw/`. I convert them to constant 30 fps c
 | `resume` | Profile → Resume → preview + Resume summary |
 | `ask` | From the application: Ask Brief → ask "What should I prepare for this role?" → answer streams → chips appear |
 | `mock` | Mock tab → pick job → Speak → answer one question aloud → End → feedback card |
-| `offline` | Pull down quick settings → Airplane mode on → Ask Brief → new question → answer |
+| ~~`offline`~~ | Dropped — the Privacy scene is a graphic instead. Mock uses two recordings: `mocksetup` (settings → Ready to practice → Start) and `mock` (question → preparing voice → listening → on-device transcription) |
 
 Post-process every clip to constant 30 fps (phone recorders produce variable frame rate):
 `ffmpeg -i clips/raw/<name>.mp4 -r 30 -c:v libx264 -crf 16 -pix_fmt yuv420p clips/<name>.mp4` (add `-c:a aac` for `mock`, `-an` for the rest)

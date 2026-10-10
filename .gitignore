@@ -7,3 +7,6 @@ ios/
 *.gguf
 .DS_Store
 *.keystore
+
+# Raw screen recordings for the promo video (may contain personal data)
+vids/

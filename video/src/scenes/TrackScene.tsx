@@ -19,9 +19,13 @@ export const TrackScene: React.FC = () => {
       </Headline>
       <PhoneFrame
         name="Track clip"
+        trimBefore={8 * fps}
+        durationInFrames={389}
+        playbackRate={1.75}
         premountFor={fps}
-        src=""
+        src="track.mp4"
         label="track.mp4"
+        speedLabel="Sped up 1.75×"
         style={{
           left: 1230,
           top: 101,

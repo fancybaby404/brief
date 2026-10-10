@@ -17,8 +17,9 @@ export const AskScene: React.FC = () => {
       <PhoneFrame
         name="Resume clip"
         durationInFrames={60}
+        trimBefore={15 * fps}
         premountFor={fps}
-        src=""
+        src="resume.mp4"
         label="resume.mp4"
         style={{
           left: 280,
@@ -37,9 +38,13 @@ export const AskScene: React.FC = () => {
       <PhoneFrame
         name="Ask Brief clip"
         from={60}
+        durationInFrames={405}
+        trimBefore={11 * fps}
+        playbackRate={2.5}
         premountFor={fps}
-        src=""
+        src="ask.mp4"
         label="ask.mp4"
+        speedLabel="Sped up 2.5×"
         style={{ left: 280, top: 101 }}
       />
       <Headline name="Ask headline" premountFor={fps} style={{ left: 880 }}>

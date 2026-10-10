@@ -1,6 +1,13 @@
+import { Audio } from "@remotion/media";
 import { linearTiming, TransitionSeries } from "@remotion/transitions";
 import { fade } from "@remotion/transitions/fade";
-import { useVideoConfig } from "remotion";
+import {
+  Easing,
+  interpolate,
+  staticFile,
+  useCurrentFrame,
+  useVideoConfig,
+} from "remotion";
 import { AskScene } from "./scenes/AskScene";
 import { DiscoverScene } from "./scenes/DiscoverScene";
 import { HomeScene } from "./scenes/HomeScene";
@@ -11,11 +18,36 @@ import { PrivacyScene } from "./scenes/PrivacyScene";
 import { RevealScene } from "./scenes/RevealScene";
 import { TrackScene } from "./scenes/TrackScene";
 
+const MusicBed: React.FC = () => {
+  const frame = useCurrentFrame();
+  const { durationInFrames, fps } = useVideoConfig();
+
+  return (
+    <Audio
+      name="Music bed"
+      src={staticFile("music/bed.mp3")}
+      premountFor={fps}
+      volume={interpolate(
+        frame,
+        [0, fps, durationInFrames - 2 * fps, durationInFrames - 10],
+        [0, 0.13, 0.13, 0],
+        {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+          easing: Easing.bezier(0.23, 1, 0.32, 1),
+        },
+      )}
+    />
+  );
+};
+
 // Scene sum 1896 − 8 transitions × 12 = 1800 frames (60 s @ 30 fps).
 export const BriefPromo: React.FC = () => {
   const { fps } = useVideoConfig();
 
   return (
+    <>
+    <MusicBed />
     <TransitionSeries name="Brief promo">
       <TransitionSeries.Sequence name="Hook" durationInFrames={165} premountFor={fps}>
         <HookScene />
@@ -77,5 +109,6 @@ export const BriefPromo: React.FC = () => {
         <OutroScene />
       </TransitionSeries.Sequence>
     </TransitionSeries>
+    </>
   );
 };

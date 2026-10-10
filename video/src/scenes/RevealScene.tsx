@@ -114,8 +114,9 @@ export const RevealScene: React.FC = () => {
       <PhoneFrame
         name="Onboarding clip"
         from={90}
+        trimBefore={15}
         premountFor={fps}
-        src=""
+        src="onboarding.mp4"
         label="onboarding.mp4"
         style={{
           left: 1230,
