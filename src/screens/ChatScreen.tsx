@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 import {useBrief} from '../lib/appContext';import * as DB from '../lib/db';import {uid,listMessages,saveMessage} from '../lib/db';
 import {timer} from '../lib/perf';
 import {throttle} from '../lib/throttle';
-import {modelLoaded,askBrief,suggestBriefQuestions,visionInstalled,routeIntent,visionExtractJobs,visionExtractEvent,visionExtractResume,stopGeneration,isCancelled,MODEL_MISSING} from '../lib/ai';
+import {modelLoaded,askBrief,suggestBriefQuestions,visionInstalled,routeIntent,visionExtractJobs,visionExtractEvent,visionExtractResume,stopGeneration,isCancelled,MODEL_MISSING,onModelChanged,ensureModel} from '../lib/ai';
 import {pickJobImage,pickImageFile,importChatImage,recognizeJobImage} from '../lib/imports';import {C} from '../theme/tokens';import {Heading,Icon,Popover,Txt,useKeyboardVisible,Tap} from '../components/Ui';import type {Event,Message} from '../types';
 import {CameraPanel} from '../components/CameraPanel';
 import {LiveMascot} from '../components/LiveMascot';
@@ -49,7 +49,8 @@ export function ChatScreen(){const brief=useBrief();const {profile,applications,
 
  useEffect(()=>{let active=true;setLoadedThread('');setMessages([]);setError('');setImageUri('');setSuggestions([]);setSuggestionsBusy(false);setFocus(defaultFocus);
   void listMessages(thread,PAGE).then(rows=>{if(!active)return;setMessages(rows);setHasEarlier(rows.length===PAGE);setLoadedThread(thread);const last=[...rows].reverse().find(m=>m.focusId!==undefined);if(last)setFocus(last.focusId??null);}).catch(e=>{if(active)setError((e as Error).message);});return()=>{active=false};},[thread]);
- useEffect(()=>{if(!aiReady){setVisionReady(false);return;}let active=true;void visionInstalled().then(v=>{if(active)setVisionReady(v);}).catch(()=>{if(active)setVisionReady(false);});return()=>{active=false};},[aiReady]);
+ // Re-checks whenever the model changes (this screen stays mounted while frozen, so a mount check would go stale).
+ useEffect(()=>{if(!aiReady){setVisionReady(false);return;}let active=true;const read=()=>visionInstalled().then(v=>{if(active)setVisionReady(v);}).catch(()=>{if(active)setVisionReady(false);});read();const off=onModelChanged(read);return()=>{active=false;off();};},[aiReady]);
  // Chips are optional: generate them only if the model is already loaded (never load 1.2 GB just for chips).
  useEffect(()=>{if(loadedThread!==thread||!aiReady)return;const last=[...messages].reverse().find(m=>m.role==='assistant');if(last?.card)return;if(!last?.suggestions?.length&&!modelLoaded())return;if(last?.suggestions?.length){setSuggestions(last.suggestions);return;}let active=true;const cycle=++suggestionCycle.current;setSuggestionsBusy(true);void suggestBriefQuestions(profile,applications,modelHistory(messages,focus).recent,focusApp||undefined).then(xs=>{if(active&&suggestionCycle.current===cycle)setSuggestions(xs);}).catch(()=>{}).finally(()=>{if(active&&suggestionCycle.current===cycle)setSuggestionsBusy(false);});return()=>{active=false;suggestionCycle.current++;};},[loadedThread,thread,aiReady]);
 
@@ -71,6 +72,7 @@ export function ChatScreen(){const brief=useBrief();const {profile,applications,
  /** Image turns: Qwen3-VL reads the image; native OCR text (if any) is a second, fenced source. */
  async function vision(task:'import'|'event'|'question'|'resume',followUps:NonNullable<Extract<AgentCard,{type:'job'}>['followUps']>,q:string,history:Message[],image:string){
   setWorking('Reading the image on your phone…');
+  void ensureModel().catch(()=>{}); // overlap a cold model load with OCR instead of waiting for both in series
   const ocr=await recognizeJobImage(image).catch(()=>'');
   if(task==='resume'){
    const r=await visionExtractResume(image,ocr);
@@ -122,7 +124,7 @@ export function ChatScreen(){const brief=useBrief();const {profile,applications,
  const [attachPos,setAttachPos]=useState<{left:number,bottom:number}|null>(null),[attachOpen,setAttachOpen]=useState(false),[cameraOpen,setCameraOpen]=useState(false);
  const showAttach=()=>attachBtn.current?.measureInWindow((x,y)=>{setAttachPos({left:Math.max(8,x-6),bottom:Dimensions.get('window').height-y+8});setAttachOpen(true);});
  const hideAttach=(then?:()=>void)=>{setAttachOpen(false);setTimeout(()=>{setAttachPos(null);then?.();},160);};
- async function send(text=entry){const q=text.trim(),attachment=imageUri;if((!q&&!attachment)||busy||installed===null||(attachment&&!visionReady))return;suggestionCycle.current++;setSuggestionsBusy(false);const prompt=q||'Describe this image and suggest how it could help with my job search.';setEntry('');setImageUri('');setSuggestions([]);const m:Message={id:uid('msg'),thread,role:'user',content:prompt,imageUri:attachment||undefined,createdAt:new Date().toISOString(),focusId:focus};const previous=messages;setMessages(old=>[...old,m]);await saveMessage(m);await respond(prompt,previous,m,attachment||undefined);}
+ async function send(text=entry){const q=text.trim(),attachment=imageUri;if((!q&&!attachment)||busy||installed===null||(attachment&&!visionReady))return;suggestionCycle.current++;setSuggestionsBusy(false);void stopGeneration();const prompt=q||'Describe this image and suggest how it could help with my job search.';setEntry('');setImageUri('');setSuggestions([]);const m:Message={id:uid('msg'),thread,role:'user',content:prompt,imageUri:attachment||undefined,createdAt:new Date().toISOString(),focusId:focus};const previous=messages;setMessages(old=>[...old,m]);await saveMessage(m);await respond(prompt,previous,m,attachment||undefined);}
  function retry(){const i=messages.map(m=>m.role).lastIndexOf('user');if(i>=0&&!busy){suggestionCycle.current++;setSuggestionsBusy(false);setSuggestions([]);void respond(messages[i].content,messages.slice(0,i),messages[i],messages[i].imageUri);}}
  const reviewEvent=(msgId:string)=>(card:Extract<AgentCard,{type:'event'}>)=>{const p=card.proposal,existing=p.eventId?events.find(e=>e.id===p.eventId):undefined;
   if(p.eventId&&!existing)return Alert.alert('Event not found','It may have been deleted.');

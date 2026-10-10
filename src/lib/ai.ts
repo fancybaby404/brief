@@ -1,12 +1,12 @@
 // On-device inference only: llama.rn loads a local GGUF (Qwen3-VL 2B + its mmproj). There is no network fallback.
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import type { LlamaContext } from 'llama.rn';
 import type { Application, Profile, Message } from '../types';
 import { getPref, setPref } from './db';
 import {
   askBriefSystem, mockSystem, EXTRACT_SYSTEM, extractUser, parseJobExtraction, ROUTER_SYSTEM, routerUser,
-  VISION_JOB_SYSTEM, VISION_JOB_JSON_SCHEMA, VISION_EVENT_SYSTEM, VISION_EVENT_JSON_SCHEMA, visionUser, parseVisionJobs, parseVisionEvent, partialAnswer, type AnswerContext,
-  MOCK_BEGIN, MOCK_FINISH, FEEDBACK_RULES, FEEDBACK_JSON_SCHEMA, parseFeedback, feedbackText, VISION_RESUME_SYSTEM, VISION_RESUME_JSON_SCHEMA, parseVisionResume,
+  VISION_JOB_SYSTEM, VISION_JOB_JSON_SCHEMA, VISION_EVENT_SYSTEM, VISION_EVENT_JSON_SCHEMA, visionUser, parseVisionJobs, parseVisionEvent, partialAnswer, answerContextBlock, type AnswerContext,
+  MOCK_BEGIN, MOCK_FINISH, FEEDBACK_RULES, FEEDBACK_JSON_SCHEMA, parseFeedback, feedbackText, VISION_RESUME_SYSTEM, VISION_RESUME_JSON_SCHEMA, parseVisionResume, mockTurnCount,
   RESUME_TEXT_SYSTEM, RESUME_TEXT_JSON_SCHEMA, resumeTextUser, parseResumeText,
 } from './prompts';
 import { ROUTER_SCHEMA, intentFromRouter } from './agent/intent';
@@ -24,6 +24,12 @@ export const MODEL_MISSING = 'Install a local model in Settings to use Brief AI.
 export async function modelPath() { return await getPref('modelPath'); }
 export async function visionProjectorPath(){return getPref('mmprojPath');}
 
+/** Fires when the installed model/projector paths change. Frozen screens subscribe so a model installed
+ *  in Settings enables AI UI the moment they come back — a mount-time check alone goes stale. */
+const modelListeners = new Set<() => void>();
+export function onModelChanged(fn: () => void) { modelListeners.add(fn); return () => { modelListeners.delete(fn); }; }
+const notifyModelChanged = () => { for (const fn of [...modelListeners]) { try { fn(); } catch {} } };
+
 /** Thrown when the user stops generation. Not an error to show: the UI keeps whatever text arrived. */
 export class Cancelled extends Error { constructor(public partial = '') { super('Stopped.'); this.name = 'Cancelled'; } }
 export const isCancelled = (e: unknown): e is Cancelled => (e as Error)?.name === 'Cancelled';
@@ -39,8 +45,9 @@ export async function configureModel(path: string,projector='') {
     await setPref('mmprojPath',previousProjector).catch(()=>{});
     throw error;
   }
+  notifyModelChanged();
 }
-export async function configureVisionProjector(path:string){await releaseModel();await setPref('mmprojPath',path);}
+export async function configureVisionProjector(path:string){await releaseModel();await setPref('mmprojPath',path);notifyModelChanged();}
 export async function releaseModel() {
   const c = context; context = null; loading = null; loadedPath = '';
   loadedProjectorPath='';visionSupported=false;visionLoaded=false;
@@ -72,7 +79,9 @@ export async function ensureModel(onProgress?: (pct: number) => void): Promise<L
         // Context sized for images when a projector exists (image tokens + prompt + reply), but the
         // projector itself loads lazily on the first image (ensureVision) to keep ~0.5 GB free otherwise.
         const done = timer('model.load');
-        const ctx=await initLlama({model,use_mlock:false,n_ctx:projector?4096:2048,n_gpu_layers:0,...(projector?{ctx_shift:false}:{})},onProgress);
+        // Android stays CPU-only: OpenCL offload needs Adreno 700+ AND a Q4_0/Q6_K build (the curated Q4_K_M isn't one).
+        // iOS uses Metal. n_threads 6 > default 4 on big.LITTLE cores; q8_0 KV cache halves attention memory traffic.
+        const ctx=await initLlama({model,use_mlock:false,n_ctx:projector?4096:2048,n_gpu_layers:Platform.OS==='ios'?99:0,n_threads:6,cache_type_k:'q8_0',...(projector?{ctx_shift:false}:{})},onProgress);
         visionSupported=false;visionLoaded=false;done();
         return ctx;
       }
@@ -207,14 +216,19 @@ export async function suggestBriefQuestions(p:Profile,jobs:Application[],history
 const ANSWER_SCHEMA = { type: 'object', properties: { answer: { type: 'string' }, suggestions: { type: 'array', items: { type: 'string' }, maxItems: 3 } }, required: ['answer', 'suggestions'] };
 /** Ask Brief: answer + follow-up chips in one pass, streamed. `extra` carries retrieved facts and an older-turns summary. */
 export async function askBrief(prompt: string, p: Profile, jobs: Application[], history: Message[] = [], selected?: Application, imageUri?: string, extra: AnswerContext = {}, onText?: (t: string) => void) {
-  const system=askBriefSystem(p,jobs,selected,extra)+'\nReturn only a JSON object with "answer" (your concise reply) and "suggestions" (exactly 3 short, distinct follow-up questions tailored to the user\'s latest message and the conversation). Never include the JSON keys in the answer text.';
+  const system=askBriefSystem(p,jobs,selected)+'\nKeep the answer under about 120 words. Return only a JSON object with "answer" (your concise reply) and "suggestions" (exactly 3 short, distinct follow-up questions tailored to the user\'s latest message and the conversation). Never include the JSON keys in the answer text.';
   let raw = '';
   try {
-    const r = await completeJson({ system, user: prompt, history, maxTokens: 440, imageUri, schema: ANSWER_SCHEMA, onText: onText ? t => { raw = t; onText(partialAnswer(t)); } : undefined }, true);
+    // Retrieved facts and the old-turns summary ride in the user message: the system stays byte-identical
+    // across turns, so the runtime reuses the cached KV prefix instead of re-reading the whole prompt.
+    const r = await completeJson({ system, user: answerContextBlock(extra) + prompt, history, maxTokens: 440, imageUri, schema: ANSWER_SCHEMA, onText: onText ? t => { raw = t; onText(partialAnswer(t)); } : undefined }, true);
     raw = clean(String(r.text || ''));
   } catch (e) { if (isCancelled(e)) throw new Cancelled(partialAnswer(e.partial || raw)); throw e; }
   const data = parseJsonObject(raw);
   if (typeof data?.answer === 'string' && data.answer.trim()) return { answer: data.answer.trim(), suggestions: parseSuggestions(raw) };
+  // A reply that hit the token cap leaves truncated JSON: partialAnswer still recovers the answer text.
+  const salvaged = partialAnswer(raw).trim();
+  if (salvaged) return { answer: salvaged, suggestions: [] };
   if (!raw) throw new Error('The on-device model returned an empty response. Try again or change models.');
   return { answer: raw, suggestions: [] };
 }
@@ -238,7 +252,8 @@ export async function visionExtractEvent(imageUri: string, instruction: string, 
 export type MockTurn = { mode?: MockMode; question?: string; topic?: string; asked?: number; voice?: boolean; onText?: (t: string) => void };
 /** Next interviewer turn. History is the session so far (the last 6 turns go to the model). */
 export function mockInterview(prompt: string, p: Profile, job: Application, history: Message[] = [], o: MockTurn = {}) {
-  return generate(mockSystem(p, job, false, o.mode, o.question, o.asked, o.voice, o.topic), prompt, history, o.question ? 300 : o.voice ? 120 : 160, o.onText);
+  const user=o.question?prompt:prompt+mockTurnCount(o.asked??0);
+  return generate(mockSystem(p, job, false, o.mode, o.question, o.voice, o.topic), user, history, o.question ? 300 : o.voice ? 120 : 160, o.onText);
 }
 /** End-of-session feedback as validated JSON (scores, strengths, improvements, a better answer from the candidate's
  *  own facts). Uses the whole session transcript, clipped, not just the last turns. null data = plain text fallback. */

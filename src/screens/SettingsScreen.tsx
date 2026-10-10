@@ -6,7 +6,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import {useBrief} from '../lib/appContext';
 import {C} from '../theme/tokens';
 import {CURRENCIES} from '../lib/currency';
-import {MODEL_CATALOG} from '../lib/modelCatalog';
+import {MODEL_CATALOG,type CatalogModel} from '../lib/modelCatalog';
 import {deleteLocalFile,downloadCatalogBundle,pickModel,pickVisionProjector,probeImageUri} from '../lib/imports';
 import {benchmarkModel,configureModel,configureVisionProjector,inspectModel,modelLoaded,modelPath,probeVision,supportsVision,visionProjectorPath} from '../lib/ai';
 import {speechInstalled,speechModelPaths,installedModel} from '../lib/voice/stt';
@@ -25,14 +25,14 @@ import appConfig from '../../app.json';
 type SettingsStackParamList={home:undefined;ai:undefined;voice:undefined;notifications:undefined;privacy:undefined;advanced:undefined;about:undefined;resume:undefined};
 type SettingsRoute=keyof SettingsStackParamList;
 const TITLES:Record<SettingsRoute,string>={home:'Settings',ai:'Brief AI',voice:'Voice interviews',notifications:'Notifications',privacy:'Privacy',advanced:'Advanced & diagnostics',about:'About Brief',resume:'Resume'};
-const MODEL=MODEL_CATALOG[0];
+const MODEL=MODEL_CATALOG[0]; // the recommended default
 const SettingsStack=createNativeStackNavigator<SettingsStackParamList>();
 
 type SettingsManager={
  profile:Profile;updateProfile:(profile:Profile)=>Promise<void>;currency:string;timeFormat:'12h'|'24h';aiSummary:string;voiceSummary:string;onBack:()=>void;
  onRefresh:()=>Promise<void>;onEditName:()=>void;onCurrency:()=>void;onTime:()=>void;
  modelFile:string;modelExists:boolean;projectorFile:string;projectorExists:boolean;status:string;name:string;textReady:boolean;visionReady:boolean;result:string;resultError:boolean;
- onCheck:()=>void;onDownload:()=>void;onImportModel:()=>void;onImportEncoder:()=>void;onRemove:()=>void;
+ onCheck:()=>void;onDownload:(entry:CatalogModel)=>void;onImportModel:()=>void;onImportEncoder:()=>void;onRemove:()=>void;
  onVoiceStatus:(status:string)=>void;onVoiceBusy:(busy:boolean)=>void;busyChild:boolean;
  fx:ReturnType<typeof useBrief>['fx'];fxError:string;refreshFx:()=>Promise<{ok:boolean,error?:string}>;replayOnboarding:()=>Promise<void>;
 };
@@ -122,25 +122,28 @@ export function SettingsScreen(){
   finally{modelOperation.current=false;setSetupStage(null);setModelProgress(null);void refreshOverview();}
  }
 
- async function downloadBriefModel(){
+ async function downloadBriefModel(entry:CatalogModel){
   if(modelOperation.current)return;
   modelOperation.current=true;cancelRequested.current=false;setModelError(false);setModelResult('');setModelProgress(0);setSetupStage('download-model');
   let downloaded:{modelUri:string,projectorUri:string}|null=null,oldModel='',oldProjector='',switched=false;
   try{
-   downloaded=await downloadCatalogBundle(MODEL,p=>setModelProgress(Math.round(p*100)),task=>{downloadTask.current=task;if(task&&cancelRequested.current)void task.cancelAsync();});
+   downloaded=await downloadCatalogBundle(entry,p=>setModelProgress(Math.round(p*100)),task=>{downloadTask.current=task;if(task&&cancelRequested.current)void task.cancelAsync();});
    if(!downloaded){setModelResult('Download canceled. Your current model is unchanged.');return;}
-   const info=await inspectModel(downloaded.modelUri);if(info.architecture!=='qwen3vl')throw new Error('The downloaded model file is not a compatible Qwen3-VL model.');
+   const info=await inspectModel(downloaded.modelUri);
+   if(entry.projector&&!info.vision)throw new Error('This model file cannot read images. The download was removed.');
    [oldModel,oldProjector]=await Promise.all([modelPath(),visionProjectorPath()]);
    await configureModel(downloaded.modelUri,downloaded.projectorUri);switched=true;setModelFile(downloaded.modelUri);setProjectorFile(downloaded.projectorUri);
    setSetupStage('load-model');setModelProgress(0);
    const benchmark=await benchmarkModel(p=>setModelProgress(Math.max(0,Math.min(100,Math.round(p)))),()=>{setSetupStage('check-model');setModelProgress(null);});
-   if(!await supportsVision())throw new Error('The matching image encoder could not be initialized. Your previous model was restored.');
-   const imageCheck=await probeVision(await probeImageUri());
-   if(!imageCheck.passed)throw new Error(`The image check failed (“${imageCheck.answer||'no answer'}”). Your previous model was restored.`);
+   if(entry.projector){
+    if(!await supportsVision())throw new Error('The matching image encoder could not be initialized. Your previous model was restored.');
+    const imageCheck=await probeVision(await probeImageUri());
+    if(!imageCheck.passed)throw new Error(`The image check failed (“${imageCheck.answer||'no answer'}”). Your previous model was restored.`);
+   }
    if(oldModel&&oldModel!==downloaded.modelUri)await deleteLocalFile(oldModel).catch(()=>{});
    if(oldProjector&&oldProjector!==downloaded.projectorUri)await deleteLocalFile(oldProjector).catch(()=>{});
-   setModelFile(downloaded.modelUri);setProjectorFile(downloaded.projectorUri);setModelExists(true);setProjectorExists(true);setTextReady(true);setVisionReady(true);setAiSummary('Ready');
-   setModelResult(`Brief AI is ready for text and images · ${benchmark.tokensPerSec.toFixed(1)} tokens/s`);
+   setModelFile(downloaded.modelUri);setProjectorFile(downloaded.projectorUri);setModelExists(true);setProjectorExists(!!entry.projector);setTextReady(true);setVisionReady(!!entry.projector);setAiSummary('Ready');
+   setModelResult(entry.projector?`Brief AI is ready for text and images · ${benchmark.tokensPerSec.toFixed(1)} tokens/s`:`${entry.name} is ready for text · ${benchmark.tokensPerSec.toFixed(1)} tokens/s · image input needs a vision model`);
   }catch(error){
    if(switched)await configureModel(oldModel,oldProjector).catch(()=>{});
    if(downloaded){await deleteLocalFile(downloaded.modelUri).catch(()=>{});await deleteLocalFile(downloaded.projectorUri).catch(()=>{});}
@@ -150,9 +153,9 @@ export function SettingsScreen(){
   }
  }
 
- function confirmDownload(){
-  if(modelFile&&modelExists){Alert.alert('Switch to Brief AI?','Brief will keep the current model until the new model and image support pass local checks.',[{text:'Cancel',style:'cancel'},{text:'Continue',onPress:()=>void downloadBriefModel()}]);return;}
-  void downloadBriefModel();
+ function confirmDownload(entry:CatalogModel){
+  if(modelFile&&modelExists){const same=modelFile.includes(entry.id);Alert.alert(same?`Reinstall ${entry.name}?`:`Switch to ${entry.name}?`,`Brief keeps the current model until the new one${entry.projector?' and its image support':''} passes local checks.`,[{text:'Cancel',style:'cancel'},{text:'Continue',onPress:()=>void downloadBriefModel(entry)}]);return;}
+  void downloadBriefModel(entry);
  }
  function cancelModelDownload(){cancelRequested.current=true;void downloadTask.current?.cancelAsync();}
 
@@ -216,7 +219,7 @@ export function SettingsScreen(){
  }
 
  const currentModelStatus=modelError?'Needs attention':!modelFile?'Not installed':!modelExists?'File missing':textReady&&visionReady?'Ready for text and images':textReady?'Ready for text':projectorFile&&projectorExists?'Installed · image check needed':'Installed';
- const currentModelName=modelFile?.includes(MODEL.id)?'Qwen3-VL 2B Instruct Q4_K_M':'Custom local model';
+ const currentModelName=modelFile?MODEL_CATALOG.find(m=>modelFile.includes(m.id))?.name??'Custom local model':'';
 
  async function saveName(){
   if(nameSaving)return;setNameSaving(true);
@@ -313,15 +316,15 @@ function SettingsHome({active,aiSummary,voiceSummary,onRefresh,onPush,onEditName
  </ScrollView>;
 }
 
-function BriefAiSettings({modelFile,modelExists,projectorFile,projectorExists,status,name,textReady,visionReady,result,resultError,onCheck,onDownload,onImportModel,onImportEncoder,onRemove}:{modelFile:string,modelExists:boolean,projectorFile:string,projectorExists:boolean,status:string,name:string,textReady:boolean,visionReady:boolean,result:string,resultError:boolean,onCheck:()=>void,onDownload:()=>void,onImportModel:()=>void,onImportEncoder:()=>void,onRemove:()=>void}){
+function BriefAiSettings({modelFile,modelExists,projectorFile,projectorExists,status,name,textReady,visionReady,result,resultError,onCheck,onDownload,onImportModel,onImportEncoder,onRemove}:{modelFile:string,modelExists:boolean,projectorFile:string,projectorExists:boolean,status:string,name:string,textReady:boolean,visionReady:boolean,result:string,resultError:boolean,onCheck:()=>void,onDownload:(entry:CatalogModel)=>void,onImportModel:()=>void,onImportEncoder:()=>void,onRemove:()=>void}){
  const [advanced,setAdvanced]=useState(false);
- const canUseOfficial=!!modelFile&&modelFile.includes(MODEL.id)&&modelExists;
+ const canUseOfficial=!!modelFile&&MODEL_CATALOG.some(m=>modelFile.includes(m.id))&&modelExists;
  return <ScrollView contentContainerStyle={{paddingHorizontal:18,paddingTop:16,paddingBottom:28,gap:18}}>
   <SettingsSection title="On-device model"><SettingsGroup>
-   <SettingsRow icon="hardware-chip-outline" label={modelFile?name:'Qwen3-VL 2B Instruct Q4_K_M'} value={status} detail={modelFile?'Used by Brief AI chats and interview practice':'Recommended for chat, interviews, and images'} />
+   <SettingsRow icon="hardware-chip-outline" label={modelFile?name:MODEL.name} value={status} detail={modelFile?'Used by Brief AI chats and interview practice':'Recommended for chat, interviews, and images'} />
    {!modelFile||!modelExists?<>
     <SettingsDivider/>
-    <Tap accessibilityRole="button" onPress={onDownload} style={{minHeight:52,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,backgroundColor:C.blue,marginHorizontal:12,marginVertical:12,borderRadius:13}}><Icon name="cloud-download-outline" size={18} color={C.white}/><Txt size={15} bold color={C.white}>{modelFile?'Reinstall Brief AI':'Download Brief AI'}</Txt></Tap>
+    <Tap accessibilityRole="button" onPress={()=>onDownload(MODEL)} style={{minHeight:52,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,backgroundColor:C.blue,marginHorizontal:12,marginVertical:12,borderRadius:13}}><Icon name="cloud-download-outline" size={18} color={C.white}/><Txt size={15} bold color={C.white}>{modelFile?'Reinstall Brief AI':'Download Brief AI'}</Txt></Tap>
    </>:<>
     <SettingsDivider/>
     <SettingsRow icon="checkmark-circle-outline" label="Local setup check" value="Run check" onPress={onCheck}/>
@@ -331,7 +334,25 @@ function BriefAiSettings({modelFile,modelExists,projectorFile,projectorExists,st
    </>}
   </SettingsGroup></SettingsSection>
 
-  {!canUseOfficial&&<Txt size={12} color={C.muted} style={{lineHeight:18}}>Brief’s recommended model is Qwen3-VL 2B Instruct Q4_K_M with its matching image encoder. Downloading the pair needs {MODEL.sizeLabel} and an internet connection. Your current model stays active until the new setup passes its local checks.</Txt>}
+  <SettingsSection title="Download a model"><SettingsGroup style={{paddingBottom:4}}>
+   {MODEL_CATALOG.map((entry,i)=>{
+    const current=!!modelFile&&modelFile.includes(entry.id);
+    return <View key={entry.id} style={{paddingHorizontal:14,paddingVertical:12,gap:8,borderTopWidth:i?1:0,borderTopColor:C.line}}>
+     <View style={{flexDirection:'row',alignItems:'center',gap:8}}>
+      <Txt bold size={14} style={{flex:1}}>{entry.name}</Txt>
+      {!!entry.badge&&<View style={{backgroundColor:C.pale,borderRadius:8,paddingHorizontal:7,paddingVertical:2}}><Txt size={10} bold color={C.blue}>{entry.badge}</Txt></View>}
+      {current&&<Icon name="checkmark-circle" size={15} color={C.green}/>}
+     </View>
+     <Txt size={12} color={C.muted} style={{lineHeight:17}}>{entry.description}</Txt>
+     <Txt size={11} color={C.muted}>{entry.sizeLabel} · {entry.projector?'Text + images':'Text only'} · {entry.license}</Txt>
+     <Tap accessibilityRole="button" accessibilityLabel={`${current?'Reinstall':'Download'} ${entry.name}, ${entry.sizeLabel}`} onPress={()=>onDownload(entry)} style={{minHeight:40,alignItems:'center',justifyContent:'center',borderRadius:11,backgroundColor:current?C.pale2:C.pale}}>
+      <Txt size={13} bold color={C.blue}>{current?'Reinstall':'Download'}</Txt>
+     </Tap>
+    </View>;
+   })}
+  </SettingsGroup></SettingsSection>
+
+  {!canUseOfficial&&<Txt size={12} color={C.muted} style={{lineHeight:18}}>Brief’s recommended model is {MODEL.name} with its matching image encoder. Downloading the pair needs {MODEL.sizeLabel} and an internet connection. Your current model stays active until the new setup passes its local checks.</Txt>}
   {!modelFile&&<Txt size={12} color={C.muted}>The download starts only when you tap the button. Saved jobs and preferences work without a model.</Txt>}
   {modelFile&&<SettingsSection title="Manage"><SettingsGroup>
    <SettingsRow icon="trash-outline" label="Remove local model" value="Remove" onPress={onRemove}/>

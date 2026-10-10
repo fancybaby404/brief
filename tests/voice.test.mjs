@@ -9,7 +9,7 @@ import { base64ToBytes, joinChunks, level, durationMs, Endpointer, cleanTranscri
 import { Sha256 } from '../src/lib/voice/sha256.ts';
 import { chooseVoice, STT_MODELS, VAD_MODEL } from '../src/lib/voice/catalog.ts';
 import { summarizeSessions, questionsAsked, shouldWrapUp, parseThread, TARGET_QUESTIONS } from '../src/lib/voice/sessions.ts';
-import { mockSystem, parseFeedback, feedbackText, parseVisionResume, MOCK_BEGIN, MOCK_FINISH } from '../src/lib/prompts.ts';
+import { mockSystem, mockTurnCount, parseFeedback, feedbackText, parseVisionResume, MOCK_BEGIN, MOCK_FINISH } from '../src/lib/prompts.ts';
 
 const run = (events, s = initialVoiceState()) => events.reduce(voiceReducer, s);
 
@@ -160,9 +160,9 @@ test('a full interview wraps up after the target number of answers; practice doe
 const job = { id: 'j', company: 'Acme', title: 'React Developer', status: 'applied', location: '', salary: '', employmentType: '', description: 'React, TypeScript', sourceUrl: '', createdAt: '', appliedAt: null, notes: '' };
 const profile = { name: '', skills: 'React', education: '', experience: 'Built a booking app', goals: '', resumeUri: '', resumeText: '', useResumeForAI: false };
 test('full interviews defer evaluation; practice evaluates; voice replies are plain sentences', () => {
-  const full = mockSystem(profile, job, false, 'technical', undefined, 2, true);
+  const full = mockSystem(profile, job, false, 'technical', undefined, true);
   assert.match(full, /Do NOT evaluate/);
-  assert.match(full, /question 3 of about 5/);
+  assert.match(mockTurnCount(2), /question 3 of about 5/);
   assert.match(full, /say aloud/);
   assert.match(mockSystem(profile, job, false, 'job', 'Tell me about yourself.'), /try again/);
   assert.match(mockSystem(profile, job, false, 'resume'), /resume deep-dive/);

@@ -9,7 +9,7 @@ import {EASE_IN_OUT,EASE_OUT,ROW_IN} from '../theme/motion';
 import {C} from '../theme/tokens';
 import {Card,Icon,Mascot,Primary,Tap,Txt,Wordmark,useReducedMotion,type Mood} from './Ui';
 import {LiveMascot} from './LiveMascot';
-import {modelPath} from '../lib/ai';
+import {modelPath,onModelChanged} from '../lib/ai';
 
 type Action={label:string,onPress:()=>void,icon?:string};
 
@@ -86,7 +86,7 @@ export function InlineError({message,onRetry}:{message:string,onRetry?:()=>void}
 }
 
 /** null while checking, so the setup card never flashes for people who already have a model. */
-export function useModelInstalled(){const [v,setV]=useState<boolean|null>(null);useEffect(()=>{void modelPath().then(p=>setV(!!p));},[]);return v;}
+export function useModelInstalled(){const [v,setV]=useState<boolean|null>(null);useEffect(()=>{const read=()=>void modelPath().then(p=>setV(!!p));read();return onModelChanged(read);},[]);return v;}
 
 /** Proactive "no model yet" card for Ask Brief and Mock, shown before the user hits an error. */
 export function ModelSetupCard({onOpenSettings,feature}:{onOpenSettings:()=>void,feature:string}){

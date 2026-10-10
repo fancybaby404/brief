@@ -235,10 +235,10 @@ export function OnboardingScreen(){
    [previousModel,previousProjector]=await Promise.all([modelPath(),visionProjectorPath()]);
    await configureModel(downloaded.modelUri,downloaded.projectorUri);switched=true;setInstalledModel(downloaded.modelUri);setSetupStage('load-model');setModelProgress(0);
    await benchmarkModel(p=>setModelProgress(Math.max(0,Math.min(100,Math.round(p)))),()=>{setSetupStage('check-model');setModelProgress(null);});
-   if(!await supportsVision())throw new Error('Image support did not initialize. Your previous model is restored.');
+   if(entry.projector&&!await supportsVision())throw new Error('Image support did not initialize. Your previous model is restored.');
    if(previousModel&&previousModel!==downloaded.modelUri)await deleteLocalFile(previousModel).catch(()=>{});
    if(previousProjector&&previousProjector!==downloaded.projectorUri)await deleteLocalFile(previousProjector).catch(()=>{});
-   setSetupMessage(`${entry.name} is ready for text and images on this phone. Continue when you’re ready.`);
+   setSetupMessage(`${entry.name} is ready ${entry.projector?'for text and images':'for text'} on this phone. Continue when you’re ready.`);
   }catch(e){
    if(switched){await configureModel(previousModel,previousProjector).catch(()=>{});setInstalledModel(previousModel);}
    if(downloaded){await deleteLocalFile(downloaded.modelUri).catch(()=>{});await deleteLocalFile(downloaded.projectorUri).catch(()=>{});}
@@ -289,12 +289,12 @@ export function OnboardingScreen(){
    <View style={{gap:9}}>
     <Txt size={12} color={C.muted} style={{textAlign:'center'}}>Local AI is optional. Download a recommended model directly to this phone, or import a compatible GGUF you already have.</Txt>
     {MODEL_CATALOG.map(entry=><View key={entry.id} style={{gap:8,borderRadius:15,borderWidth:1,borderColor:C.line,padding:12,backgroundColor:C.white}}>
-     <View style={{flexDirection:'row',alignItems:'flex-start',gap:8}}><View style={{flex:1,gap:3}}><Txt bold size={14}>{entry.name}</Txt><Txt size={12} color={C.muted}>{entry.description}</Txt><Txt size={11} color={C.muted}>{entry.sizeLabel} · Q4_K_M + Q8_0 vision encoder · {entry.license}</Txt></View><Icon name="cloud-download-outline" size={18} color={C.blue}/></View>
+     <View style={{flexDirection:'row',alignItems:'flex-start',gap:8}}><View style={{flex:1,gap:3}}><Txt bold size={14}>{entry.name}{entry.badge?` · ${entry.badge}`:''}</Txt><Txt size={12} color={C.muted}>{entry.description}</Txt><Txt size={11} color={C.muted}>{entry.sizeLabel} · {entry.projector?'Text + images':'Text only'} · {entry.license}</Txt></View><Icon name="cloud-download-outline" size={18} color={C.blue}/></View>
      <Tap accessibilityRole="button" accessibilityLabel={`${installedModel?'Download and switch to':'Download'} ${entry.name}, ${entry.sizeLabel}`} onPress={()=>void installFromCatalog(entry)} style={{minHeight:42,flexDirection:'row',alignItems:'center',justifyContent:'center',borderRadius:12,backgroundColor:C.pale}}><Txt size={13} bold color={C.blue}>{installedModel?'Download & switch':'Download model'}</Txt></Tap>
     </View>)}
     <Tap accessibilityRole="button" onPress={()=>void importLocalModel()} style={{minHeight:44,alignItems:'center',justifyContent:'center'}}><Txt size={13} bold color={C.blue}>Import a model from this device instead</Txt></Tap>
     {!!setupMessage&&<Txt size={12} color={setupError?C.danger:C.green} style={{textAlign:'center'}}>{setupMessage}</Txt>}
-    <Txt size={11} color={C.muted} style={{textAlign:'center'}}>Source: official Qwen GGUF files on Hugging Face. Downloads stay on this device; conversations never leave it.</Txt>
+    <Txt size={11} color={C.muted} style={{textAlign:'center'}}>Source: each model’s official GGUF files on Hugging Face. Downloads stay on this device; conversations never leave it.</Txt>
    </View>
   </>)}
   {page(4,<VoicePage x={x} i={4} width={width} active={index===4} onBusyChange={setVoiceBusy}/>)}
